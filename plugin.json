@@ -5,7 +5,7 @@
     {
       "name": "workflow",
       "path": "skills/workflow.md",
-      "description": "Structured development workflow: architecture plan implementation with multi-model review loops, artifact management, exhaustive reviews, and phone notifications. Use when starting implementation of an architecture plan, kicking off a review cycle, or resuming a workflow session."
+      "description": "Structured development workflow: architecture plan implementation with multi-model review loops, artifact management, exhaustive reviews, and Slack notifications. Use when starting implementation of an architecture plan, kicking off a review cycle, or resuming a workflow session."
     },
     {
       "name": "review",
@@ -21,6 +21,11 @@
       "name": "dirgrab",
       "path": "skills/dirgrab.md",
       "description": "Gather codebase context with dirgrab CLI. Walks a directory, concatenates file contents into a single output for LLM consumption. Supports dry-run file listing (-l), comma-separated exclusions (-e), token stats (-s), and persistent config. Use when you need a code snapshot for analysis, review, or sharing with external tools like Gemini or Codex."
+    },
+    {
+      "name": "init-project",
+      "path": "skills/init-project.md",
+      "description": "Initialize a project for Claude Code by scanning the personal MCP and snippet catalog, recommending items based on the tech stack, and writing the project's .mcp.json and CLAUDE.md. Use when setting up a new project, reconfiguring an existing one, or when the user says 'init project'."
     }
   ]
 }

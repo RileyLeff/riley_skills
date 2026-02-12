@@ -45,16 +45,17 @@ Use Gemini when:
 ## Step 1: Create Temp Directory
 
 Create a unique temp directory for this review session to avoid collisions with
-other concurrent Claude sessions:
+other concurrent agent sessions:
 
 ```bash
 REVIEW_DIR=$(mktemp -d /tmp/review-XXXXXXXX)
 echo "Review temp dir: $REVIEW_DIR"
 ```
 
-Use `$REVIEW_DIR/context.txt`, `$REVIEW_DIR/prompt.txt`, and
-`$REVIEW_DIR/output.txt` for all files in this review. **Never use hardcoded
-paths like `/tmp/review-context.txt`** — multiple sessions will collide.
+Use `$REVIEW_DIR/context.txt`, `$REVIEW_DIR/prompt.txt`,
+`$REVIEW_DIR/output.txt`, and `$REVIEW_DIR/session_id` for all files in this
+review. **Never use hardcoded paths like `/tmp/review-context.txt`** — multiple
+sessions will collide.
 
 ## Step 2: Gather Context
 
@@ -118,13 +119,7 @@ codex exec - \
 Timeout: 600000ms. May take 2-5 minutes.
 
 ### If Gemini:
-```bash
-cat "$REVIEW_DIR/prompt.txt" | gemini \
-  "$(cat "$REVIEW_DIR/prompt.txt")" \
-  --sandbox -o text > "$REVIEW_DIR/output.txt" 2>&1
-```
 
-Actually, for Gemini, the simpler pattern is:
 ```bash
 cat "$REVIEW_DIR/context.txt" | gemini "You are reviewing this codebase in
 READ-ONLY mode. Do NOT edit, write, or modify any files.
@@ -132,25 +127,53 @@ READ-ONLY mode. Do NOT edit, write, or modify any files.
 [REVIEW_INSTRUCTION]" --sandbox -o text > "$REVIEW_DIR/output.txt" 2>&1
 ```
 
-## Step 6: Present Results
+## Step 6: Capture Session ID
+
+Immediately after the review command returns, capture the session UUID so
+follow-ups target the correct session. **Never use `--last` or `latest`** —
+parallel agent sessions will collide.
+
+### If Codex:
+```bash
+SESSION_ID=$(ls -t ~/.codex/sessions/$(date -u +%Y/%m/%d)/*.jsonl 2>/dev/null \
+  | head -1 \
+  | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+echo "$SESSION_ID" > "$REVIEW_DIR/session_id"
+```
+
+### If Gemini:
+```bash
+SESSION_ID=$(gemini --list-sessions 2>/dev/null \
+  | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \
+  | tail -1)
+echo "$SESSION_ID" > "$REVIEW_DIR/session_id"
+```
+
+If the UUID capture fails (empty string), warn the user that follow-ups may not
+work reliably, but continue presenting the review.
+
+## Step 7: Present Results
 
 Read and present the review output to the user.
 
-## Step 7: Follow-up (Optional)
+## Step 8: Follow-up (Optional)
 
-If the user has follow-up questions:
+If the user has follow-up questions, read the session ID from
+`$REVIEW_DIR/session_id` and resume that specific session.
 
 ### Codex follow-up:
 ```bash
-echo "follow-up question" | codex resume --last --sandbox read-only 2>&1
+SESSION_ID=$(cat "$REVIEW_DIR/session_id")
+codex exec resume "$SESSION_ID" "follow-up question" --sandbox read-only 2>&1
 ```
 
 ### Gemini follow-up:
 ```bash
-echo "follow-up question" | gemini -r latest --sandbox -o text 2>&1
+SESSION_ID=$(cat "$REVIEW_DIR/session_id")
+echo "follow-up question" | gemini -r "$SESSION_ID" --sandbox -o text 2>&1
 ```
 
-## Step 8: File Artifacts (if in workflow)
+## Step 9: File Artifacts (if in workflow)
 
 If this review is part of a workflow session (check if `planning/reviews/`
 exists), file the review output:

@@ -9,10 +9,9 @@ triggers:
   - "grab the code"
   - "get codebase context"
   - "code snapshot"
-  - "prepare for code review"
   - "dirgrab"
   - "gather context"
-  - "share code with gemini"
+  - "share code with"
 allowed-tools:
   - Bash
   - Read
@@ -25,6 +24,20 @@ concatenates their contents into a single output for LLM consumption. It
 respects `.gitignore`, includes untracked files by default, and produces
 deterministically-ordered output.
 
+## Installation
+
+If `dirgrab` is not installed, tell the user and offer these options:
+
+```bash
+# Homebrew (macOS/Linux)
+brew tap rileyleff/rileytap && brew install dirgrab
+
+# Cargo (any platform with Rust)
+cargo install dirgrab
+```
+
+Source: https://github.com/rileyleff/dirgrab
+
 ## Quick Start
 
 ```bash
@@ -35,7 +48,8 @@ dirgrab -l
 dirgrab -s
 
 # Write to file for external tools (best for reviews)
-dirgrab --no-tree -o /tmp/codebase.txt -s
+REVIEW_DIR=$(mktemp -d /tmp/review-XXXXXXXX)
+dirgrab --no-tree -o "$REVIEW_DIR/context.txt" -s
 
 # Copy to clipboard
 dirgrab -c

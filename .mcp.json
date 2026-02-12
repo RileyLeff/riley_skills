@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "slack-notify": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${CLAUDE_PLUGIN_ROOT}/mcp/slack-notify",
+        "slack-notify"
+      ],
+      "env": {
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+        "SLACK_CHANNEL": "${SLACK_CHANNEL}"
+      }
+    }
+  }
+}

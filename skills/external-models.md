@@ -1,7 +1,7 @@
 ---
 name: external-models
 description: >
-  Reference for invoking external AI models (Codex, Gemini) from Claude Code.
+  Reference for invoking external AI models (Codex, Gemini, or Claude).
   Capabilities, flags, strengths, weaknesses, and invocation patterns. Use when
   you need to shell out to another model for reviews, multimodal analysis, agent
   tasks, or any cross-model collaboration.
@@ -16,13 +16,15 @@ triggers:
   - "invoke gemini"
   - "send to codex"
   - "send to gemini"
+  - "gemini"
+  - "codex"
 ---
 
 # External Model Reference
 
 ## Codex CLI
 
-**Model**: gpt-5.3-codex, reasoning level xhigh (configured in `~/.codex/config.toml`)
+**Model**: gpt-5.3-codex, reasoning level xhigh (configured as default in `~/.codex/config.toml`)
 **Context**: ~258k tokens with excellent auto-compact
 
 ### Strengths
@@ -30,26 +32,30 @@ triggers:
 - Trustworthy for write access when instructed
 - Excellent at following specific, well-scoped instructions
 - Good at agentic exploration and bug hunting
+- Extremely smart, has non-overlapping intelligence with Claude
+- Behaves like a "senior engineer"
 
 ### Weaknesses
 - Can take a very long time on large prompts
+
+### Notes
 - No `--approval-mode` flag — use `--sandbox` instead
 
 ### Invocation Patterns
 
 **Read-only review** (most common):
 ```bash
-codex exec - --sandbox read-only -o /tmp/codex-output.txt < /tmp/prompt.txt 2>&1
+codex exec - --sandbox read-only -o "$REVIEW_DIR/output.txt" < "$REVIEW_DIR/prompt.txt" 2>&1
 ```
 
 **Write access** (for edits, test writing, bug fixing):
 ```bash
-codex exec - --sandbox workspace-write -o /tmp/codex-output.txt < /tmp/prompt.txt 2>&1
+codex exec - --sandbox workspace-write -o "$REVIEW_DIR/output.txt" < "$REVIEW_DIR/prompt.txt" 2>&1
 ```
 
-**Resume a session** (follow-up questions):
+**Resume a session** (follow-up with a specific session ID):
 ```bash
-echo "follow-up question" | codex resume --last --sandbox read-only 2>&1
+codex exec resume "$SESSION_ID" "follow-up question" --sandbox read-only 2>&1
 ```
 
 ### Key Flags
@@ -62,7 +68,7 @@ echo "follow-up question" | codex resume --last --sandbox read-only 2>&1
 ### Important
 - **Never** pass `--full-auto`
 - **Always** build prompts as files, pipe via stdin (`< file`), not as shell arguments
-- Sessions persist automatically; use `codex resume --last` for follow-ups
+- Sessions persist automatically; resume by UUID (see review skill) to avoid collisions
 - Can take 2-5 minutes on large codebases — use generous timeouts (600000ms)
 
 ---
@@ -82,14 +88,14 @@ echo "follow-up question" | codex resume --last --sandbox read-only 2>&1
 ### Weaknesses
 - Not a good agent — struggles to follow instructions reliably
 - Will try to write even when told read-only (hence the sandbox flag)
-- Not great at agentic search or multi-step reasoning
+- Not great at agentic search
 - Quality degrades with very large context even though window allows it
 
 ### Invocation Patterns
 
 **Read-only review** (pipe codebase via stdin):
 ```bash
-cat /tmp/context.txt | gemini "You are reviewing this codebase in READ-ONLY mode.
+cat "$REVIEW_DIR/context.txt" | gemini "You are reviewing this codebase in READ-ONLY mode.
 Do NOT edit, write, or modify any files. [PROMPT HERE]" --sandbox -o text 2>&1
 ```
 
@@ -98,15 +104,15 @@ Do NOT edit, write, or modify any files. [PROMPT HERE]" --sandbox -o text 2>&1
 gemini "Analyze this image: [description of what to look for]" --sandbox -o text < image.png 2>&1
 ```
 
-**Resume a session**:
+**Resume a session** (follow-up with a specific session ID):
 ```bash
-echo "follow-up" | gemini -r latest --sandbox -o text 2>&1
+echo "follow-up" | gemini -r "$SESSION_ID" --sandbox -o text 2>&1
 ```
 
 ### Key Flags
 - `--sandbox` : OS-level write restriction (Seatbelt on macOS)
 - `-o text` : readable output format
-- `-r latest` : resume most recent session
+- `-r <UUID>` : resume a specific session by ID (prefer over `latest`)
 - `-p` : non-interactive headless mode
 - No `--yolo` or `-y` — never auto-approve tool calls
 
@@ -116,19 +122,25 @@ echo "follow-up" | gemini -r latest --sandbox -o text 2>&1
 - **Always** use `--sandbox` on every invocation
 - **Always** include read-only instructions in the prompt (belt and suspenders
   with sandbox)
-- Make sure code is committed before dirgrab or it may miss uncommitted changes
-- Sessions persist; use `-r latest` for follow-ups
+- dirgrab includes untracked files by default — no need to commit first (only
+  `--tracked-only` mode skips uncommitted files)
+- Sessions persist; resume by UUID (see review skill) to avoid collisions
 
 ---
 
-## Claude (self-reference)
+## Claude
 
 **Model**: opus-4.6
 **Training cutoff**: May 2025
 
+If you are a claude model, consider using sub-agents instead of full-fat separate instances of claude code. If you aren't, consider using claude in cases that require high-fidelity tool use and agentic behavior. As of Opus 4.6, Claude is approximately as smart as OpenAI's Codex 5.3 with xhigh reasoning level, but Claude is drastically faster, and can iterate more rapidly as a result.
+
 When orchestrating multi-model work, defer to this file for correct model names
-and invocation patterns. If something here looks outdated, tell Riley — he
-maintains this file.
+and invocation patterns. If something here looks outdated or you find a mismatch
+between real-world use and the patterns described in this skill, tell the user
+and suggest filing an issue or PR at this skill's
+[github repository](https://github.com/rileyleff/riley_skills).
+
 
 ---
 
@@ -142,5 +154,5 @@ maintains this file.
 | Multimodal (images, docs, OCR) | Gemini | Best multimodal by far |
 | Long-context analysis | Gemini | 1M context window |
 | Test writing | Codex (write mode) | Good at following test conventions |
-| Implementation | Claude (you) | That's your job |
+| Implementation | Claude | Smart and faster than codex, faster iteration |
 | Quick second opinion | Gemini | Fast, low-effort |
