@@ -57,17 +57,15 @@ For each step:
 
 After completing a step (or a meaningful chunk within a step), run a review:
 
-### Invoking Codex for Review
+### Running a Review
 
-Use `codex exec` in read-only sandbox mode. Pipe in context about what changed
-and what to review:
+Use the **review** skill (`skills/review.md` in this plugin) to run the actual
+review. It handles dirgrab, model invocation, and safety flags. Default model is
+Codex; use Gemini for very large codebases or multimodal reviews.
 
-```bash
-git diff HEAD~N..HEAD | codex exec -q "Review this diff for bugs, logic errors, edge cases, and deviations from the architecture plan at planning/architecture.md. Be specific. Flag severity: major (must fix), minor (should fix), or note (observation/tradeoff)." --sandbox read-only
-```
-
-Adjust `HEAD~N` to cover the commits since the last review. For broader reviews,
-use dirgrab or provide the full file contents.
+For the review prompt, include: what changed, what to look for, and a reference
+to the architecture plan. Ask the reviewer to flag severity: major (must fix),
+minor (should fix), or note (observation/tradeoff).
 
 ### Filing Review Artifacts
 
@@ -177,18 +175,14 @@ This workflow runs in **tmux**. Riley may attach and detach at any time.
   the review notes.
 - If Riley asks a clarifying question mid-session, answer it and continue.
 
-## 9. Codex Collaboration Notes
+## 9. External Model Usage
 
-Codex (gpt-5.3-codex) is strong at:
-- Catching bugs and edge cases in review
-- Agentic codebase exploration (it discovers structure on its own)
-- Following specific, well-scoped instructions
+For model capabilities, invocation flags, and selection guidance, read the
+**external-models** skill (`skills/external-models.md` in this plugin).
 
-Use it primarily for:
-- **Post-implementation review** (the core review loop above)
-- **Test writing** (it can write tests with write access if directed)
-- **Targeted bug hunting** (point it at a subsystem and ask it to find issues)
-
-Model/effort is configured in `~/.codex/config.toml` — no need to pass flags.
-Use `--sandbox read-only` for reviews, `--sandbox workspace-write` if you want
-it to make edits.
+Key uses within a workflow session:
+- **Post-implementation review**: Use the **review** skill (default: Codex)
+- **Test writing**: Codex with `--sandbox workspace-write`
+- **Targeted bug hunting**: Codex pointed at a specific subsystem
+- **Large codebase review**: Gemini for its 1M context window
+- **Multimodal analysis**: Gemini for images, docs, OCR

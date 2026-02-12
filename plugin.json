@@ -6,6 +6,16 @@
       "name": "workflow",
       "path": "skills/workflow.md",
       "description": "Structured development workflow: architecture plan implementation with multi-model review loops, artifact management, exhaustive reviews, and phone notifications. Use when starting implementation of an architecture plan, kicking off a review cycle, or resuming a workflow session."
+    },
+    {
+      "name": "review",
+      "path": "skills/review.md",
+      "description": "Run a code review using an external model (Codex or Gemini). Gathers codebase context with dirgrab, invokes the model in read-only sandbox mode, presents structured results. Use when the user asks for a code review, codex review, or gemini review."
+    },
+    {
+      "name": "external-models",
+      "path": "skills/external-models.md",
+      "description": "Reference for invoking external AI models (Codex, Gemini) from Claude Code. Capabilities, flags, strengths, weaknesses, and invocation patterns. Use when shelling out to another model for any purpose — reviews, multimodal analysis, agent tasks, or cross-model collaboration."
     }
   ]
 }
