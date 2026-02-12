@@ -5,14 +5,21 @@ My little set of Claude Code tools. Will push new ones and updates over time. If
 ## Install
 
 ```bash
-claude plugin add rileyleff/riley-skills
+claude plugin marketplace add rileyleff/riley_skills
+claude plugin install riley-skills
+```
+
+Or from inside Claude Code:
+```
+/plugin marketplace add rileyleff/riley_skills
+/plugin install riley-skills
 ```
 
 Some skills depend on external tools:
 
 - **review** and **dirgrab** need [dirgrab](https://github.com/rileyleff/dirgrab) installed (`brew tap rileyleff/rileytap && brew install dirgrab` or `cargo install dirgrab`)
 - **review** needs [Codex CLI](https://github.com/openai/codex) and/or [Gemini CLI](https://github.com/google-gemini/gemini-cli) installed
-- **slack-notify** needs [uv](https://docs.astral.sh/uv/) installed and `SLACK_BOT_TOKEN` + `SLACK_CHANNEL` env vars set (see the [workflow skill](skills/workflow.md#5-human-checkpoints--notifications) for setup details)
+- **slack-notify** needs [uv](https://docs.astral.sh/uv/) installed and `SLACK_BOT_TOKEN` + `SLACK_CHANNEL` env vars set (see the [workflow skill](skills/workflow/SKILL.md#5-human-checkpoints--notifications) for setup details)
 
 ## Contents
 
