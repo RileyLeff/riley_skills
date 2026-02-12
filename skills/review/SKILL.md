@@ -104,11 +104,14 @@ Timeout: 600000ms. May take 2-5 minutes.
 
 ### If Gemini:
 
-```bash
-cat "$REVIEW_DIR/context.txt" | gemini "You are reviewing this codebase in
-READ-ONLY mode. Do NOT edit, write, or modify any files.
+The prompt file from Step 4 already contains the full codebase and instructions.
+Pipe it via stdin with a short `-p` flag — **never** pass a long inline prompt
+string, as Gemini CLI fails (exit 13) when stdin is large and the positional
+prompt arg is long.
 
-[REVIEW_INSTRUCTION]" --sandbox -o text > "$REVIEW_DIR/output.txt" 2>&1
+```bash
+cat "$REVIEW_DIR/prompt.txt" | gemini -p "Follow the instructions in stdin." \
+  --sandbox -o text > "$REVIEW_DIR/output.txt" 2>&1
 ```
 
 ## Step 6: Capture Session ID

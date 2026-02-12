@@ -76,10 +76,15 @@ codex exec resume "$SESSION_ID" "follow-up question" --sandbox read-only 2>&1
 
 ### Invocation Patterns
 
-**Read-only review** (pipe codebase via stdin):
+**Read-only review** (build prompt file, pipe via stdin):
+
+Build a prompt file containing the full codebase + instructions (same as the
+Codex pattern), then pipe it. Keep the `-p` arg short — Gemini CLI fails
+(exit 13) when stdin is large and the inline prompt string is long.
+
 ```bash
-cat "$REVIEW_DIR/context.txt" | gemini "You are reviewing this codebase in READ-ONLY mode.
-Do NOT edit, write, or modify any files. [PROMPT HERE]" --sandbox -o text 2>&1
+cat "$REVIEW_DIR/prompt.txt" | gemini -p "Follow the instructions in stdin." \
+  --sandbox -o text > "$REVIEW_DIR/output.txt" 2>&1
 ```
 
 **Multimodal analysis** (images, documents):
