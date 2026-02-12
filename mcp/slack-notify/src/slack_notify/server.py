@@ -2,7 +2,6 @@
 
 import asyncio
 import os
-import sys
 import time
 
 import httpx
@@ -12,23 +11,28 @@ SLACK_API = "https://slack.com/api"
 DEFAULT_POLL_INTERVAL = 10  # seconds
 DEFAULT_TIMEOUT = 1800  # 30 minutes
 
+_bot_token: str | None = None
+_channel: str | None = None
+
 
 def _get_config() -> tuple[str, str]:
+    global _bot_token, _channel
+    if _bot_token and _channel:
+        return _bot_token, _channel
     token = os.environ.get("SLACK_BOT_TOKEN", "").strip()
     channel = os.environ.get("SLACK_CHANNEL", "").strip()
-    errors = []
-    if not token:
-        errors.append("SLACK_BOT_TOKEN is not set")
-    if not channel:
-        errors.append("SLACK_CHANNEL is not set")
-    if errors:
-        for e in errors:
-            print(f"slack-notify: {e}", file=sys.stderr)
-        sys.exit(1)
-    return token, channel
+    if not token or not channel:
+        missing = []
+        if not token:
+            missing.append("SLACK_BOT_TOKEN")
+        if not channel:
+            missing.append("SLACK_CHANNEL")
+        raise RuntimeError(
+            f"slack-notify: missing env var(s): {', '.join(missing)}"
+        )
+    _bot_token, _channel = token, channel
+    return _bot_token, _channel
 
-
-BOT_TOKEN, CHANNEL = _get_config()
 
 mcp = FastMCP(
     "slack-notify",
@@ -41,8 +45,9 @@ mcp = FastMCP(
 
 
 def _headers() -> dict[str, str]:
+    token, _ = _get_config()
     return {
-        "Authorization": f"Bearer {BOT_TOKEN}",
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json; charset=utf-8",
     }
 
@@ -62,7 +67,7 @@ async def _post_message(text: str) -> dict:
         resp = await client.post(
             f"{SLACK_API}/chat.postMessage",
             headers=_headers(),
-            json={"channel": CHANNEL, "text": text},
+            json={"channel": _get_config()[1], "text": text},
         )
         resp.raise_for_status()
         data = resp.json()
@@ -94,7 +99,7 @@ async def _poll_for_reply(
             resp = await client.get(
                 f"{SLACK_API}/conversations.replies",
                 headers=_headers(),
-                params={"channel": CHANNEL, "ts": thread_ts},
+                params={"channel": _get_config()[1], "ts": thread_ts},
             )
             resp.raise_for_status()
             data = resp.json()

@@ -96,13 +96,71 @@ Show the user what was written:
 - Which snippets were added to `CLAUDE.md`
 - Any env vars they need to set (check the catalog README for requirements)
 
+## Catalog Format
+
+The catalog is a personal collection of reusable configs. Nothing in it is
+active by default — this skill (or manual setup) copies items into per-project
+config files.
+
+### Setting up the catalog
+
+```bash
+mkdir -p ~/.claude/catalog/mcps ~/.claude/catalog/snippets
+```
+
+Optionally add a `~/.claude/catalog/README.md` documenting what's available
+and any env var requirements. This skill reads the README for additional context
+when making recommendations.
+
+### MCP entries (`mcps/`)
+
+Each file is a JSON object with one key (the server name) whose value is a
+standard MCP server config. The key becomes the server name in the project's
+`.mcp.json` under `"mcpServers"`.
+
+**HTTP server** (e.g. `github.json`):
+```json
+{
+  "github": {
+    "type": "http",
+    "url": "https://api.githubcopilot.com/mcp/",
+    "headers": {
+      "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+    }
+  }
+}
+```
+
+**stdio server** (e.g. `slack-notify.json`):
+```json
+{
+  "slack-notify": {
+    "command": "uv",
+    "args": ["run", "--directory", "/path/to/server", "slack-notify"],
+    "env": {
+      "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+      "SLACK_CHANNEL": "${SLACK_CHANNEL}"
+    }
+  }
+}
+```
+
+Environment variables use `${VAR_NAME}` syntax — Claude Code resolves them
+at runtime. Document required env vars in the catalog README so the init skill
+can remind the user to set them.
+
+### Snippet entries (`snippets/`)
+
+Each file is a markdown document containing instructions to append to a
+project's `CLAUDE.md`. One file per topic (e.g. `rust-conventions.md`,
+`testing-policy.md`). The file's content is copied verbatim — no templating.
+
 ## Notes
 
 - The catalog is a personal reference, not a runtime system. This skill
   reads it and writes standard Claude Code config files.
 - If the catalog directory doesn't exist or is empty, tell the user and
-  explain where to create it (`~/.claude/catalog/mcps/` and
-  `~/.claude/catalog/snippets/`).
+  explain where to create it (see "Setting up the catalog" above).
 - Don't add MCPs the user didn't select. Auto-detection is for
   *recommendations*, not auto-installation.
 - For MCPs with env var requirements (like `SLACK_BOT_TOKEN`), remind
