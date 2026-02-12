@@ -20,7 +20,7 @@
     {
       "name": "dirgrab",
       "path": "skills/dirgrab.md",
-      "description": "Gather codebase context with dirgrab CLI. Walks a directory, concatenates file contents into a single output for LLM consumption. Use when you need a code snapshot for analysis, review, or sharing with external tools."
+      "description": "Gather codebase context with dirgrab CLI. Walks a directory, concatenates file contents into a single output for LLM consumption. Supports dry-run file listing (-l), comma-separated exclusions (-e), token stats (-s), and persistent config. Use when you need a code snapshot for analysis, review, or sharing with external tools like Gemini or Codex."
     }
   ]
 }

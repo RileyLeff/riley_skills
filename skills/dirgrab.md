@@ -4,7 +4,7 @@ description: >
   Gather codebase context with dirgrab. Walks a directory, finds relevant files
   (respecting git context and .gitignore), and concatenates their contents into
   a single output. Use when you need a code snapshot for analysis, review, or
-  sharing with external tools.
+  sharing with external tools like Gemini or Codex.
 triggers:
   - "grab the code"
   - "get codebase context"
@@ -12,6 +12,7 @@ triggers:
   - "prepare for code review"
   - "dirgrab"
   - "gather context"
+  - "share code with gemini"
 allowed-tools:
   - Bash
   - Read
@@ -19,86 +20,198 @@ allowed-tools:
 
 # dirgrab - Codebase Context Gathering
 
-`dirgrab` is a CLI tool that walks a directory, finds relevant files (respecting
-git context and .gitignore), and concatenates their contents into a single
-output. It's useful for gathering code context to share with LLMs or external
-tools.
+`dirgrab` walks a directory (or Git repo), selects the files that matter, and
+concatenates their contents into a single output for LLM consumption. It
+respects `.gitignore`, includes untracked files by default, and produces
+deterministically-ordered output.
 
-## Basic Usage
+## Quick Start
 
 ```bash
-# Output to stdout
-dirgrab
+# Preview what files will be included (dry run — no content read)
+dirgrab -l
 
-# Copy to clipboard (good for piping to other tools like Gemini CLI)
+# Output to stdout with stats
+dirgrab -s
+
+# Write to file for external tools (best for reviews)
+dirgrab --no-tree -o /tmp/codebase.txt -s
+
+# Copy to clipboard
 dirgrab -c
-
-# Write to a temp file (best for passing to other tools)
-dirgrab -o /tmp/codebase.txt
 ```
+
+## Always Preview First
+
+Use `-l/--list` before a full grab to verify your exclusions are right. This
+prints one file path per line without reading any content — fast and free:
+
+```bash
+# Check what would be included
+dirgrab -l -e '*.lock,planning/'
+
+# Then grab for real
+dirgrab --no-tree -o /tmp/context.txt -e '*.lock,planning/' -s
+```
+
+This prevents the "grabbed 200k tokens of garbage" problem.
 
 ## Token Efficiency
 
-When gathering code for LLM consumption, token count matters. Use `-s` to see
-output statistics including approximate token counts:
+Use `-s` to see output statistics (printed to stderr):
 
 ```bash
-dirgrab -s
+dirgrab -s --no-tree 2>&1 | tail -10
 ```
 
-This prints per-file token breakdowns, helping you identify files that are
-hogging tokens. Common culprits:
-- Lock files (`package-lock.json`, `Cargo.lock`, `*.lock`)
-- Planning/documentation directories (`planning/`, `docs/`, `*.md`)
-- Build artifacts (`dist/`, `build/`, `target/`)
-- Generated files (`*.generated.*`, `*.min.js`)
-- Large data files or fixtures
+Output includes total size, word count, approximate token count, and a
+per-file token leaderboard. Common token hogs:
+- **Lock files**: `Cargo.lock`, `package-lock.json` (~10k+ tokens each)
+- **Planning/review artifacts**: `planning/`, old review outputs
+- **Build artifacts**: `target/`, `dist/`, `node_modules/`
+- **Generated/minified files**: `*.min.js`, `*.generated.*`
+- **Large data files**: fixtures, CSVs, sample PDFs
 
 ## Exclusion Patterns
 
-Use `-e` to exclude files/directories with gitignore-style globs:
+`-e` accepts comma-separated gitignore-style globs. This is the most concise
+way to exclude multiple patterns:
 
 ```bash
-dirgrab -c -s -e "*.lock" -e "package-lock.json" -e "planning/**"
+# Comma-separated (preferred — one flag, multiple patterns)
+dirgrab -e '*.lock,planning/,*.csv,target/'
+
+# Multiple -e flags (also works)
+dirgrab -e '*.lock' -e 'planning/'
 ```
 
-Choose exclusions based on what's relevant for the task:
-- For a code review: exclude tests, docs, lock files
-- For debugging: maybe include tests but exclude unrelated directories
-- For architecture overview: exclude implementation details, keep structure
+**Important**: Always quote `-e` values to prevent shell glob expansion.
+
+Suggested exclusions by task:
+- **Code review**: `-e '*.lock,planning/,*.csv,docs/'`
+- **Debugging**: `-e '*.lock,target/,dist/'` (keep tests)
+- **Architecture overview**: `-e '*.lock,*.test.*,__tests__/'`
+
+## Output Format
+
+dirgrab output has this structure (important for parsing):
+
+```
+---
+DIRECTORY STRUCTURE
+---
+
+<indented tree>
+
+---
+FILE CONTENTS
+---
+
+--- FILE: relative/path/to/file.rs ---
+<file contents>
+
+--- FILE: relative/path/to/other.py ---
+<file contents>
+```
+
+- **Tree section**: Directory structure overview. Skipped with `--no-tree`.
+  Almost always use `--no-tree` for LLM consumption — the tree is redundant
+  since file headers already show the structure, and it wastes tokens.
+- **File headers**: `--- FILE: <path> ---` lines separate files. Paths are
+  relative to repo root (git mode) or target directory (no-git mode).
+- **PDF files**: Extracted text appears inline. Failed extractions show
+  `--- FILE: path (PDF extraction failed) ---`.
 
 ## Key Flags
 
 | Flag | Description |
 |------|-------------|
+| `-l, --list` | Dry-run: print file paths only (no content) |
 | `-c, --clipboard` | Copy output to clipboard |
-| `-o [FILE]` | Write to file (defaults to `dirgrab.txt` if no path given) |
-| `-s, --stats` | Show token/size statistics (helps identify bloat) |
-| `-e PATTERN` | Exclude pattern (can be used multiple times) |
-| `--no-tree` | Skip directory structure overview |
-| `--no-headers` | Skip `--- FILE: name ---` headers |
+| `-o [FILE]` | Write to file (defaults to `dirgrab.txt`) |
+| `-s, --stats` | Show token/size stats on stderr |
+| `-e PATTERN` | Exclude patterns (comma-separated or repeated) |
+| `--no-tree` | Skip directory tree (recommended for LLM use) |
+| `--no-headers` | Skip `--- FILE: ---` headers |
 | `--tracked-only` | Only include git-tracked files |
+| `--all-repo` | Include entire repo even from a subdirectory |
+| `--no-git` | Ignore git context, walk filesystem directly |
+| `--no-config` | Ignore config files and `.dirgrabignore` |
 
-## .dirgrabignore
+## Configuration
 
-If a `.dirgrabignore` file exists in the project root, dirgrab uses it
-automatically (gitignore syntax). Good for projects where you always want
-the same exclusions.
+dirgrab layers config in this order (later wins):
+1. Built-in defaults
+2. Global config: `~/.config/dirgrab/config.toml` + `ignore`
+3. Project config: `<target>/.dirgrab.toml` + `.dirgrabignore`
+4. CLI flags
 
-## Composing with Other Tools
+### .dirgrabignore
 
-dirgrab gathers context that gets piped to other tools:
+If a `.dirgrabignore` exists in the project root, dirgrab uses it
+automatically. Uses gitignore syntax. Recommended starter for most projects:
 
-```bash
-# Save to file for a review skill
-dirgrab --no-tree -o /tmp/review-context.txt -s
+```gitignore
+# Lock files (huge, no signal)
+*.lock
+package-lock.json
 
-# Pipe to Gemini CLI directly
-dirgrab -c -s -e "*.lock" && gemini "review this code"
+# Build artifacts
+target/
+dist/
+build/
+node_modules/
 
-# Save and reference
-dirgrab -o /tmp/code.txt -s && cat /tmp/code.txt | some-other-tool
+# Planning/review artifacts (can confuse review models)
+planning/
+
+# Large data
+*.csv
+*.sqlite
 ```
 
-When composing with external tools, use `-c` (clipboard) or `-o` (file output)
-to capture the output cleanly.
+### .dirgrab.toml
+
+For persistent flag defaults (avoids repeating CLI flags):
+
+```toml
+[dirgrab]
+exclude = ["*.lock", "target/", "planning/"]
+
+[stats]
+enabled = true
+```
+
+## Gotchas
+
+- **Stats go to stderr**, not stdout. Use `2>&1` if you need to see stats
+  alongside output, or `2>&1 | tail -10` to just check stats.
+- **`-o` auto-excludes the output file** from the grab to prevent
+  self-ingestion. You don't need to manually exclude `dirgrab.txt`.
+- **Planning directories confuse external models**. If your repo has old
+  reviews or planning docs, exclude them — models may review the *described*
+  project instead of the actual code.
+- **The installed version matters**. If `dirgrab --version` shows an old
+  version, the cargo-installed copy may be shadowing the Homebrew one.
+  Check with `which -a dirgrab`.
+
+## Composing with External Tools
+
+```bash
+# Standard pattern for reviews (unique temp dir to avoid collisions)
+REVIEW_DIR=$(mktemp -d /tmp/review-XXXXXXXX)
+dirgrab --no-tree -e '*.lock,planning/' -o "$REVIEW_DIR/context.txt" -s
+
+# Pipe to Gemini CLI
+dirgrab -c --no-tree -e '*.lock' && gemini "review this code"
+
+# Check token budget before committing to an expensive model call
+dirgrab -s --no-tree -e '*.lock' 2>&1 | tail -5
+# If under ~250k tokens: safe for Codex
+# If under ~400k tokens: safe for Gemini
+# If over: add more exclusions
+```
+
+When composing with external tools, **always use `--no-tree`** (saves tokens)
+and **always use unique temp paths** (prevents cross-session collisions when
+multiple Claude sessions run concurrently).

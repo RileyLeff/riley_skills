@@ -42,7 +42,21 @@ Use Gemini when:
 - The review involves images or documents (multimodal)
 - The user explicitly asks for Gemini
 
-## Step 1: Gather Context
+## Step 1: Create Temp Directory
+
+Create a unique temp directory for this review session to avoid collisions with
+other concurrent Claude sessions:
+
+```bash
+REVIEW_DIR=$(mktemp -d /tmp/review-XXXXXXXX)
+echo "Review temp dir: $REVIEW_DIR"
+```
+
+Use `$REVIEW_DIR/context.txt`, `$REVIEW_DIR/prompt.txt`, and
+`$REVIEW_DIR/output.txt` for all files in this review. **Never use hardcoded
+paths like `/tmp/review-context.txt`** — multiple sessions will collide.
+
+## Step 2: Gather Context
 
 Run `dirgrab -s --no-tree` to show per-file token breakdowns. If a
 `.dirgrabignore` exists, it's used automatically.
@@ -54,22 +68,22 @@ dirgrab -s --no-tree 2>&1 | tail -15
 If stats look reasonable (under ~250k for Codex, ~500k for Gemini), proceed.
 Otherwise, ask the user what to exclude via `-e` flags.
 
-## Step 2: Capture Codebase
+## Step 3: Capture Codebase
 
 Write dirgrab output to a temp file. Always use `--no-tree` (the tree wastes
 tokens).
 
 ```bash
-dirgrab --no-tree -o /tmp/review-context.txt -s 2>&1
+dirgrab --no-tree -o "$REVIEW_DIR/context.txt" -s 2>&1
 ```
 
-## Step 3: Build Prompt
+## Step 4: Build Prompt
 
 Create a prompt file wrapping the codebase. **Never pass codebase content as a
 shell argument** — always build a file and pipe it.
 
 ```bash
-cat > /tmp/review-prompt.txt << 'PROMPT_HEADER'
+cat > "$REVIEW_DIR/prompt.txt" << 'PROMPT_HEADER'
 You are reviewing this codebase in READ-ONLY mode. Do NOT edit, write, or
 modify any files. Only analyze and report.
 
@@ -78,9 +92,9 @@ Here is the full codebase:
 <codebase>
 PROMPT_HEADER
 
-cat /tmp/review-context.txt >> /tmp/review-prompt.txt
+cat "$REVIEW_DIR/context.txt" >> "$REVIEW_DIR/prompt.txt"
 
-cat >> /tmp/review-prompt.txt << 'PROMPT_FOOTER'
+cat >> "$REVIEW_DIR/prompt.txt" << 'PROMPT_FOOTER'
 </codebase>
 
 [REVIEW_INSTRUCTION]
@@ -92,37 +106,37 @@ Replace `[REVIEW_INSTRUCTION]` with the user's request, or use the default:
 and areas for improvement. Flag severity: major (must fix), minor (should fix),
 or note (observation/tradeoff). Provide specific file and function references."
 
-## Step 4: Run Review
+## Step 5: Run Review
 
 ### If Codex:
 ```bash
 codex exec - \
   --sandbox read-only \
-  -o /tmp/review-output.txt \
-  < /tmp/review-prompt.txt 2>&1
+  -o "$REVIEW_DIR/output.txt" \
+  < "$REVIEW_DIR/prompt.txt" 2>&1
 ```
 Timeout: 600000ms. May take 2-5 minutes.
 
 ### If Gemini:
 ```bash
-cat /tmp/review-prompt.txt | gemini \
-  "$(cat /tmp/review-prompt.txt)" \
-  --sandbox -o text > /tmp/review-output.txt 2>&1
+cat "$REVIEW_DIR/prompt.txt" | gemini \
+  "$(cat "$REVIEW_DIR/prompt.txt")" \
+  --sandbox -o text > "$REVIEW_DIR/output.txt" 2>&1
 ```
 
 Actually, for Gemini, the simpler pattern is:
 ```bash
-cat /tmp/review-context.txt | gemini "You are reviewing this codebase in
+cat "$REVIEW_DIR/context.txt" | gemini "You are reviewing this codebase in
 READ-ONLY mode. Do NOT edit, write, or modify any files.
 
-[REVIEW_INSTRUCTION]" --sandbox -o text > /tmp/review-output.txt 2>&1
+[REVIEW_INSTRUCTION]" --sandbox -o text > "$REVIEW_DIR/output.txt" 2>&1
 ```
 
-## Step 5: Present Results
+## Step 6: Present Results
 
 Read and present the review output to the user.
 
-## Step 6: Follow-up (Optional)
+## Step 7: Follow-up (Optional)
 
 If the user has follow-up questions:
 
@@ -136,7 +150,7 @@ echo "follow-up question" | codex resume --last --sandbox read-only 2>&1
 echo "follow-up question" | gemini -r latest --sandbox -o text 2>&1
 ```
 
-## Step 7: File Artifacts (if in workflow)
+## Step 8: File Artifacts (if in workflow)
 
 If this review is part of a workflow session (check if `planning/reviews/`
 exists), file the review output:
