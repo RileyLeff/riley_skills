@@ -1,23 +1,6 @@
 ---
 name: external-models
-description: >
-  Reference for invoking external AI models (Codex, Gemini, or Claude).
-  Capabilities, flags, strengths, weaknesses, and invocation patterns. Use when
-  you need to shell out to another model for reviews, multimodal analysis, agent
-  tasks, or any cross-model collaboration.
-triggers:
-  - "use codex"
-  - "use gemini"
-  - "codex agent"
-  - "gemini multimodal"
-  - "which model"
-  - "external model"
-  - "invoke codex"
-  - "invoke gemini"
-  - "send to codex"
-  - "send to gemini"
-  - "gemini"
-  - "codex"
+description: "Reference for invoking external AI models (Codex, Gemini, or Claude). Capabilities, flags, strengths, weaknesses, and invocation patterns. Use when you need to shell out to another model for reviews, multimodal analysis, agent tasks, or any cross-model collaboration."
 ---
 
 # External Model Reference

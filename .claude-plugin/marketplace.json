@@ -1,0 +1,14 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "riley-skills",
+  "owner": {
+    "name": "RileyLeff"
+  },
+  "plugins": [
+    {
+      "name": "riley-skills",
+      "source": "./",
+      "description": "Workflow automation, multi-model review orchestration, and project conventions for Claude Code."
+    }
+  ]
+}

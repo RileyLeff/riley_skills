@@ -1,25 +1,6 @@
 ---
 name: workflow
-description: >
-  Structured development workflow: architecture plan implementation with
-  multi-model review loops, artifact management, exhaustive reviews, and
-  push notifications. Use when starting implementation of an architecture
-  plan, kicking off a review cycle, or resuming a workflow session.
-triggers:
-  - "start workflow"
-  - "implement the plan"
-  - "kick off implementation"
-  - "exhaustive review"
-  - "resume workflow"
-  - "workflow review"
-allowed-tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Glob
-  - Grep
-  - AskUserQuestion
+description: "Structured development workflow: architecture plan implementation with multi-model review loops, artifact management, exhaustive reviews, and push notifications. Use when starting implementation of an architecture plan, kicking off a review cycle, or resuming a workflow session."
 ---
 
 # Development Workflow
@@ -88,7 +69,7 @@ For each step:
 ## 3. Review Protocol
 
 After completing a step, run a review using the **review** skill
-(`skills/review.md` in this plugin). It handles context gathering, model
+(`skills/review/SKILL.md` in this plugin). It handles context gathering, model
 invocation, and safety flags.
 
 For the review prompt, include: what changed, what to look for, and a reference
@@ -232,7 +213,7 @@ terminal, etc.).
 ## 8. External Model Usage
 
 For model capabilities, invocation flags, and selection guidance, read the
-**external-models** skill (`skills/external-models.md` in this plugin).
+**external-models** skill (`skills/external-models/SKILL.md` in this plugin).
 
 Key uses within a workflow session:
 - **Post-implementation review**: Use the **review** skill (default: Codex)

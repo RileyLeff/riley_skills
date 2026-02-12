@@ -1,32 +1,16 @@
 ---
 name: review
-description: >
-  Run a code review using an external model (Codex or Gemini). Gathers codebase
-  context with dirgrab, sends to the chosen model in read-only sandbox mode,
-  and presents structured results. Supports follow-up sessions.
-triggers:
-  - "code review"
-  - "codex review"
-  - "gemini review"
-  - "run a review"
-  - "review the code"
-  - "get a review"
-  - "external review"
-allowed-tools:
-  - Bash
-  - Read
-  - Glob
-  - AskUserQuestion
+description: "Run a code review using an external model (Codex or Gemini). Gathers codebase context with dirgrab, sends to the chosen model in read-only sandbox mode, and presents structured results. Supports follow-up sessions."
 ---
 
 # Code Review with External Model
 
 **Before proceeding, read these skills** from this plugin's `skills/` directory:
-- `skills/external-models.md` — model capabilities and invocation details
-- `skills/dirgrab.md` — how to gather codebase context
+- `skills/external-models/SKILL.md` — model capabilities and invocation details
+- `skills/dirgrab/SKILL.md` — how to gather codebase context
 
 If you can't find them at a relative path, check
-`~/.claude/plugins/*/riley_skills/skills/` or the `riley_skills` plugin
+`~/.claude/plugins/cache/*/riley-skills/skills/` or the `riley-skills` plugin
 directory.
 
 ## User's Request

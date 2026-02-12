@@ -1,23 +1,6 @@
 ---
 name: init-project
-description: >
-  Initialize a project for Claude Code: scan the MCP and snippet catalog,
-  ask which ones apply, and write the project's .mcp.json and CLAUDE.md.
-  Use at the start of a new project or when reconfiguring an existing one.
-triggers:
-  - "init project"
-  - "initialize project"
-  - "set up project"
-  - "project init"
-  - "configure project"
-allowed-tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Glob
-  - Grep
-  - AskUserQuestion
+description: "Initialize a project for Claude Code: scan the MCP and snippet catalog, ask which ones apply, and write the project's .mcp.json and CLAUDE.md. Use at the start of a new project or when reconfiguring an existing one."
 ---
 
 # Project Initialization

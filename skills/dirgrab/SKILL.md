@@ -1,20 +1,6 @@
 ---
 name: dirgrab
-description: >
-  Gather codebase context with dirgrab. Walks a directory, finds relevant files
-  (respecting git context and .gitignore), and concatenates their contents into
-  a single output. Use when you need a code snapshot for analysis, review, or
-  sharing with external tools like Gemini or Codex.
-triggers:
-  - "grab the code"
-  - "get codebase context"
-  - "code snapshot"
-  - "dirgrab"
-  - "gather context"
-  - "share code with"
-allowed-tools:
-  - Bash
-  - Read
+description: "Gather codebase context with dirgrab. Walks a directory, finds relevant files (respecting git context and .gitignore), and concatenates their contents into a single output. Use when you need a code snapshot for analysis, review, or sharing with external tools like Gemini or Codex."
 ---
 
 # dirgrab - Codebase Context Gathering
