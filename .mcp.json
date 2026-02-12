@@ -9,8 +9,7 @@
         "slack-notify"
       ],
       "env": {
-        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
-        "SLACK_CHANNEL": "${SLACK_CHANNEL}"
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}"
       }
     }
   }

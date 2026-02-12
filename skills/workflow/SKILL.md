@@ -131,11 +131,22 @@ This is non-negotiable at milestones. Don't skip it, don't shortcut it.
 ### Setup
 
 Notifications use Slack via the `slack-notify` MCP server (registered in this
-plugin's `.mcp.json`). The user must set two environment variables:
+plugin's `.mcp.json`). The user must set one environment variable:
 
 - `SLACK_BOT_TOKEN` — Bot user OAuth token (`xoxb-...`). Create a Slack app
   with `chat:write` and `channels:history` scopes, install to workspace.
-- `SLACK_CHANNEL` — Channel ID to post to (find in channel details in Slack).
+
+The **channel** is configured per-project. In the project's `CLAUDE.md`, the
+user specifies which channel to use:
+
+```markdown
+## Slack
+When using slack_notify or slack_ask, use channel `C0123456789`.
+```
+
+Both tools accept an optional `channel` parameter — pass the channel ID from
+the project's `CLAUDE.md`. If no channel is provided and a `SLACK_CHANNEL` env
+var is set, the tools fall back to that.
 
 If the MCP tools (`slack_notify`, `slack_ask`) are not available in the current
 session, fall back to `AskUserQuestion` instead.
@@ -159,7 +170,8 @@ Send a notification when:
 slack_notify(
   subject="Exhaustive review complete — Phase 2",
   message="4 rounds, 0 major bugs in final 2. Ready for your review.",
-  sender="claude-workflow"
+  sender="claude-workflow",
+  channel="C0123456789"
 )
 ```
 
@@ -171,7 +183,8 @@ This posts the message and blocks until the user replies in the Slack thread
 reply = slack_ask(
   subject="Design decision needed — auth strategy",
   message="The plan specifies JWT but the codebase uses session cookies.\n1. Migrate to JWT\n2. Keep cookies and update the plan\n\nWhich do you prefer?",
-  sender="claude-workflow"
+  sender="claude-workflow",
+  channel="C0123456789"
 )
 ```
 

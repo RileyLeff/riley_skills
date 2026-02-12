@@ -19,7 +19,7 @@ Some skills depend on external tools:
 
 - **review** and **dirgrab** need [dirgrab](https://github.com/rileyleff/dirgrab) installed (`brew tap rileyleff/rileytap && brew install dirgrab` or `cargo install dirgrab`)
 - **review** needs [Codex CLI](https://github.com/openai/codex) and/or [Gemini CLI](https://github.com/google-gemini/gemini-cli) installed
-- **slack-notify** needs [uv](https://docs.astral.sh/uv/) installed and `SLACK_BOT_TOKEN` + `SLACK_CHANNEL` env vars set (see the [workflow skill](skills/workflow/SKILL.md#5-human-checkpoints--notifications) for setup details)
+- **slack-notify** needs [uv](https://docs.astral.sh/uv/) installed and a `SLACK_BOT_TOKEN` env var set (see the [workflow skill](skills/workflow/SKILL.md#5-human-checkpoints--notifications) for setup details)
 
 ## Contents
 
@@ -28,6 +28,8 @@ Some skills depend on external tools:
 #### slack-notify
 
 Simple MCP server that lets your agent ping you on Slack. Two tools: `slack_notify` for fire-and-forget status updates, and `slack_ask` for when the agent actually needs your input — it posts a message, waits for your threaded reply, and continues. Handy for long-running workflows where you don't want to babysit a terminal.
+
+Both tools accept an optional `channel` parameter. If not provided, they fall back to the `SLACK_CHANNEL` env var. This lets you configure channels per-project in your `CLAUDE.md` (e.g. "When using slack tools, use channel `C0123456789`") without touching env vars.
 
 ### Skills
 

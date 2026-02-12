@@ -121,8 +121,7 @@ standard MCP server config. The key becomes the server name in the project's
     "command": "uv",
     "args": ["run", "--directory", "/path/to/server", "slack-notify"],
     "env": {
-      "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
-      "SLACK_CHANNEL": "${SLACK_CHANNEL}"
+      "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}"
     }
   }
 }
