@@ -15,6 +15,13 @@ Or from inside Claude Code:
 /plugin install riley-skills
 ```
 
+## Update
+
+```bash
+claude plugin marketplace update riley-skills
+claude plugin update riley-skills@riley-skills
+```
+
 Some skills depend on external tools:
 
 - **review** and **dirgrab** need [dirgrab](https://github.com/rileyleff/dirgrab) installed (`brew tap rileyleff/rileytap && brew install dirgrab` or `cargo install dirgrab`)
