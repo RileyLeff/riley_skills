@@ -1,4 +1,4 @@
-# riley-skills
+# riley_skills
 
 My little set of Claude Code tools. Will push new ones and updates over time. If you find something broken or have an improvement to suggest, please let me know!
 
