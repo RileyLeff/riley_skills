@@ -1,0 +1,11 @@
+{
+  "name": "riley-skills",
+  "description": "Riley's personal development toolkit. Workflow automation, multi-model review orchestration, and project conventions.",
+  "skills": [
+    {
+      "name": "workflow",
+      "path": "skills/workflow.md",
+      "description": "Structured development workflow: architecture plan implementation with multi-model review loops, artifact management, exhaustive reviews, and phone notifications. Use when starting implementation of an architecture plan, kicking off a review cycle, or resuming a workflow session."
+    }
+  ]
+}
