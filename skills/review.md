@@ -21,11 +21,13 @@ allowed-tools:
 
 # Code Review with External Model
 
-**Before proceeding, read the external-models skill** at the plugin path
-`skills/external-models.md` (relative to this file) for model capabilities and
-invocation details. If you can't find it at a relative path, check
-`~/.claude/plugins/*/riley_skills/skills/external-models.md` or the
-`riley_skills` plugin directory.
+**Before proceeding, read these skills** from this plugin's `skills/` directory:
+- `skills/external-models.md` — model capabilities and invocation details
+- `skills/dirgrab.md` — how to gather codebase context
+
+If you can't find them at a relative path, check
+`~/.claude/plugins/*/riley_skills/skills/` or the `riley_skills` plugin
+directory.
 
 ## User's Request
 
