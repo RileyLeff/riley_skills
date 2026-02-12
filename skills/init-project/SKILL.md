@@ -20,7 +20,7 @@ The catalog lives at `~/.claude/catalog/`:
 
 ## Process
 
-### Step 1: Scan the catalog
+### Step 1: Scan the catalog and check for plugin MCPs
 
 Read all files in `~/.claude/catalog/mcps/` and `~/.claude/catalog/snippets/`.
 For each MCP, read the JSON to understand what it provides. For each snippet,
@@ -28,6 +28,13 @@ read the markdown to understand what instructions it contains.
 
 Also check if the catalog README exists (`~/.claude/catalog/README.md`) for
 any additional context about the available items.
+
+**Check for plugin-provided MCPs:** Run `claude mcp list` to see which MCP
+servers are already loaded globally via plugins (entries prefixed with
+`plugin:` in the output). These are already available in every project and
+must NOT be offered from the catalog — duplicating them in a project's
+`.mcp.json` will create broken copies (plugin MCPs often use
+`${CLAUDE_PLUGIN_ROOT}` which only resolves inside the plugin context).
 
 ### Step 2: Inspect the project
 
@@ -114,15 +121,12 @@ standard MCP server config. The key becomes the server name in the project's
 }
 ```
 
-**stdio server** (e.g. `slack-notify.json`):
+**stdio server** (e.g. `hetzner.json`):
 ```json
 {
-  "slack-notify": {
-    "command": "uv",
-    "args": ["run", "--directory", "/path/to/server", "slack-notify"],
-    "env": {
-      "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}"
-    }
+  "hetzner": {
+    "command": "uvx",
+    "args": ["mcp-hetzner"]
   }
 }
 ```
@@ -145,5 +149,9 @@ project's `CLAUDE.md`. One file per topic (e.g. `rust-conventions.md`,
   explain where to create it (see "Setting up the catalog" above).
 - Don't add MCPs the user didn't select. Auto-detection is for
   *recommendations*, not auto-installation.
-- For MCPs with env var requirements (like `SLACK_BOT_TOKEN`), remind
-  the user to set them — via `.envrc`, `.zshenv`, or similar.
+- **Never offer catalog MCPs that duplicate a plugin-provided MCP.** Plugin
+  MCPs (visible as `plugin:*` in `claude mcp list`) are already global.
+  Copying them into a project `.mcp.json` creates broken duplicates because
+  `${CLAUDE_PLUGIN_ROOT}` doesn't resolve outside the plugin context.
+- For MCPs with env var requirements, remind the user to set them — via
+  `.envrc`, `.zshenv`, or similar. Check the catalog README for details.
