@@ -121,7 +121,50 @@ echo "follow-up" | gemini -r "$SESSION_ID" --sandbox -o text 2>&1
 **Model**: opus-4.6
 **Training cutoff**: May 2025
 
-If you are a claude model, consider using sub-agents instead of full-fat separate instances of claude code. If you aren't, consider using claude in cases that require high-fidelity tool use and agentic behavior. As of Opus 4.6, Claude is approximately as smart as OpenAI's Codex 5.3 with xhigh reasoning level, but Claude is drastically faster, and can iterate more rapidly as a result.
+If you are a claude model, consider using sub-agents instead of full-fat
+separate instances of claude code. If you aren't, consider using claude in cases
+that require high-fidelity tool use and agentic behavior. As of Opus 4.6,
+Claude is approximately as smart as OpenAI's Codex 5.3 with xhigh reasoning
+level, but Claude is drastically faster, and can iterate more rapidly as a
+result.
+
+### Strengths
+- Always available — no external API, no rate limits, no cost
+- Starts fresh as a subagent without implementation bias (good for reviewing
+  code you just wrote)
+- Fast — no network round-trip to an external CLI
+- Strong at nuanced logic issues and architectural reasoning
+
+### Weaknesses
+- As the implementer, a Claude subagent shares your training data and biases —
+  it may have the same blind spots you do (this is why multi-model review is
+  valuable)
+- No persistent session for follow-ups (unlike Codex/Gemini)
+
+### Invocation Patterns
+
+**Subagent review** (used in parallel review rounds):
+
+Launch a `general-purpose` subagent via the Task tool. Read the prompt file
+built in the review flow and pass its content as the subagent prompt. Have it
+write its review to a file.
+
+```
+Task(
+  subagent_type="general-purpose",
+  run_in_background=true,
+  prompt="Read the following codebase and review instructions, then write
+    your review to $REVIEW_DIR/claude_output.txt using the Write tool.
+    [contents of $REVIEW_DIR/prompt.txt]"
+)
+```
+
+### Important
+- Subagents start with a clean context — they don't inherit your conversation
+  history, which is a feature for unbiased review
+- For parallel reviews, launch the subagent with `run_in_background=true` so it
+  runs concurrently with Codex and Gemini
+- The subagent has access to Read/Write/Glob/Grep tools but not Bash by default
 
 When orchestrating multi-model work, defer to this file for correct model names
 and invocation patterns. If something here looks outdated or you find a mismatch
@@ -136,9 +179,9 @@ and suggest filing an issue or PR at this skill's
 
 | Task | Best Model | Why |
 |------|-----------|-----|
-| Code review | Codex | Strong reasoning, follows review structure well |
+| Code review | All three in parallel | Non-overlapping blind spots; merge for consensus |
 | Bug hunting | Codex (write mode) | Can explore and fix, not just report |
-| Architecture review | Codex or Gemini | Both work; Gemini for very large codebases |
+| Architecture review | All three in parallel | Same as code review; Gemini shines on large codebases |
 | Multimodal (images, docs, OCR) | Gemini | Best multimodal by far |
 | Long-context analysis | Gemini | 1M context window |
 | Test writing | Codex (write mode) | Good at following test conventions |

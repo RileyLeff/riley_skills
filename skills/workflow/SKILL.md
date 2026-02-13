@@ -14,8 +14,8 @@ and human-in-the-loop checkpoints.
 ```
 Architecture Plan (.md)
   → Step-by-step implementation (atomic commits)
-    → Review round (Codex reviews, you fix)
-      → Exhaustive review at milestones (loop until clean)
+    → Parallel review round (Codex + Gemini + Claude, merge, fix)
+      → Exhaustive review at milestones (parallel loop until clean)
         → Human checkpoint (notify + wait)
           → Next phase or architecture revision
 ```
@@ -68,12 +68,14 @@ For each step:
 
 ## 3. Review Protocol
 
-After completing a step, run a review using the **review** skill
-(`skills/review/SKILL.md` in this plugin). It handles context gathering, model
-invocation, and safety flags.
+After completing a step, run a **parallel multi-model review** using the
+**review** skill (`skills/review/SKILL.md` in this plugin). By default, this
+launches Codex, Gemini, and a Claude subagent concurrently against the full
+codebase, then merges their findings into a single prioritized list. The review
+skill handles context gathering, parallel invocation, merging, and safety flags.
 
 For the review prompt, include: what changed, what to look for, and a reference
-to the architecture plan. Ask the reviewer to flag severity: major (must fix),
+to the architecture plan. Ask the reviewers to flag severity: major (must fix),
 minor (should fix), or note (observation/tradeoff).
 
 ### Filing Review Artifacts
@@ -84,16 +86,17 @@ Reviews go in a structured directory:
 planning/
   reviews/
     v1/                          # architecture version
-      01_codex_review.md         # first review
-      02_claude_fixes.md         # what you fixed in response
-      03_codex_review.md         # second review round
-      04_claude_fixes.md         # ...
+      01_review_round.md         # merged parallel review (codex + gemini + claude)
+      02_fixes.md                # what you fixed in response
+      03_review_round.md         # next review round
+      04_fixes.md                # ...
       review_notes_README.md     # persistent notes (see below)
 ```
 
 - **Review files**: Number incrementally (`01`, `02`, ...). Name format:
-  `NN_MODEL_review.md` for reviews (e.g., `01_codex_review.md`),
-  `NN_MODEL_fixes.md` for fix summaries (e.g., `02_claude_fixes.md`).
+  `NN_review_round.md` for merged parallel reviews,
+  `NN_fixes.md` for fix summaries. The merged review notes which models
+  participated and tags findings as `[consensus]` or `[model-only]`.
 - **Fix summaries**: After fixing bugs from a review, write what you fixed and
   reference the commit hashes. Append the commit SHAs to the original review
   file's items too.
@@ -110,18 +113,28 @@ After a review round:
 2. Fix **minor** items. Commit.
 3. Record **notes** in `review_notes_README.md` with reasoning.
 4. Run the full test suite — test failures are major items, fix before proceeding.
-5. Run another review round to verify fixes and catch new issues.
+5. Run another parallel review round to verify fixes and catch new issues.
+
+### Graceful Degradation
+
+If a model hits rate limits or errors during a round, the review skill drops it
+and continues with the remaining models. If both external models (Codex, Gemini)
+fail, Claude subagent runs alone — it's always available, has no rate limits,
+and costs nothing. In later rounds, re-add recovered models automatically. See
+the review skill's Graceful Degradation section for details.
 
 ## 4. Exhaustive Review Protocol
 
 At **major milestones** (completing a phase, finishing all steps, pre-release):
 
-1. Run a full review (not just recent diff — review the entire relevant codebase)
+1. Run a **parallel multi-model review** of the entire relevant codebase (not
+   just recent diff)
 2. Fix everything found
-3. Run another full review
-4. **Repeat until you get 2 consecutive rounds with zero major bugs.** This may
-   take many iterations — sometimes well into the twenties. That's fine. Keep
-   going until it's clean.
+3. Run another parallel review
+4. **Repeat until you get 2 consecutive rounds with zero major bugs.** Each
+   round has 3x the coverage of a single-model review, so convergence should be
+   faster. If models degrade to Claude-only due to rate limits, that's fine —
+   keep looping.
 5. File all review artifacts as above
 
 This is non-negotiable at milestones. Don't skip it, don't shortcut it.
@@ -229,7 +242,8 @@ For model capabilities, invocation flags, and selection guidance, read the
 **external-models** skill (`skills/external-models/SKILL.md` in this plugin).
 
 Key uses within a workflow session:
-- **Post-implementation review**: Use the **review** skill (default: Codex)
+- **Post-implementation review**: Use the **review** skill — runs Codex, Gemini,
+  and Claude subagent in parallel by default
 - **Test writing**: Codex with `--sandbox workspace-write`
 - **Targeted bug hunting**: Codex pointed at a specific subsystem
 - **Large codebase review**: Gemini for its 1M context window
