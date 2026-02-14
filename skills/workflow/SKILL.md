@@ -316,9 +316,10 @@ None. (or list active blockers)
 
 ## 11. Skill Improvement Feedback
 
-At each **phase completion**, include a short section in your `slack_notify`
-message noting any suggestions for improving the workflow, review, or
-external-models skills based on your experience during that phase. Examples:
+At each **phase completion**, if you ran into friction, unexpected behavior, or
+missing guidance in the workflow, review, or external-models skills, you may
+include a short feedback section in your `slack_notify` message. This is
+optional — only include it if you actually have something to report. Examples:
 
 - "Review skill: the merge step would benefit from a severity tiebreaker rule
   when models disagree"
@@ -328,4 +329,5 @@ external-models skills based on your experience during that phase. Examples:
   files >500k"
 
 Keep it to 1-3 bullet points. Only flag things you actually encountered — don't
-speculate. The user will evaluate and fold useful feedback into the skills.
+speculate or pad. If everything worked smoothly, skip this section entirely.
+The user will evaluate and fold useful feedback into the skills.
