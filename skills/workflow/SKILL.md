@@ -37,8 +37,9 @@ The soul document is usually loose in the `planning/` root.
 1. Read the full plan and soul document carefully
 2. Break the plan into discrete implementation steps — list them out
 3. If the implementation plan steps can be grouped into a smaller number of "phases", you can do that too.
-4. Save the implementation plan as planning/vN/implementation_plan.md
-5. Begin with step 1
+4. Save the implementation plan as `planning/vN/implementation_plan.md`
+5. Create `planning/vN/WORKFLOW_STATE.md` (see section 10)
+6. Begin with step 1
 
 ## 2. Implementation Protocol
 
@@ -207,9 +208,24 @@ tell messages apart when multiple agents are running.
 
 Continue the workflow using the user's reply.
 
+### Progress Notifications
+
+In addition to the decision-point notifications above, send short
+fire-and-forget `slack_notify` updates at these intervals so the user can glance
+at their phone and see things are moving:
+
+- **Every 3 review rounds** during an exhaustive review cycle (e.g., "Review
+  round 3 complete — 2 major, 1 minor remaining. Fixing now.")
+- **Every phase completion** (e.g., "Phase 2 complete. Starting Phase 3 (4
+  steps).")
+- **Midway through a phase** if the phase has more than 6 steps (e.g., "Phase 3
+  — step 4/8 complete. On track.")
+
+Keep these to 1-2 sentences. No details, no questions — just a heartbeat.
+
 ### What NOT to notify for
 
-- Routine progress (just keep working)
+- Individual step completions (unless it's a midway checkpoint above)
 - Minor decisions you can make yourself
 - Bugs you can fix without architectural guidance
 
@@ -249,6 +265,67 @@ Key uses within a workflow session:
 - **Large codebase review**: Gemini for its 1M context window
 - **Multimodal analysis**: Gemini for images, docs, OCR
 
-## 9. Planning Root Memory File
+## 9. Agent Whiteboard
 
-If you have a note or observation about the project that you think would be useful for a future agent to know, please append a note to `planning/AGENT_WHITEBOARD.md`. These should be in chronological order (new observations go at the bottom), and should have the agent's name (you), the current architecture version + phase + step, and the contents of the observation.
+If you have a note or observation about the project that you think would be
+useful for a future agent to know, append it to the whiteboard for the current
+architecture version: `planning/vN/AGENT_WHITEBOARD.md` (e.g.,
+`planning/v3/AGENT_WHITEBOARD.md`). Entries should be in chronological order
+(new observations at the bottom), and include the agent's name, the current
+phase + step, and the observation.
+
+## 10. Workflow State
+
+Maintain a `planning/vN/WORKFLOW_STATE.md` file that tracks progress on disk.
+This survives compaction, session restarts, and makes it easy for the user (or a
+new agent) to see exactly where things stand.
+
+**Create it at workflow start. Update it after every step completion, review
+round, and phase transition.** Format:
+
+```markdown
+# vN Workflow State
+
+**Current Phase:** N — Phase Name (IN PROGRESS)
+**Current Step:** N.M Description
+**Status:** Brief 1-line summary of where things are right now.
+
+## Progress
+
+| Phase | Step | Description | Status |
+|-------|------|-------------|--------|
+| 1 | 1.1 | First step | Done |
+| 1 | 1.2 | Second step | Done |
+| 1 | review | Exhaustive review (N rounds, converged) | Done |
+| 2 | 2.1 | Next phase first step | In Progress |
+
+## Blockers
+
+None. (or list active blockers)
+
+## Recent Activity
+
+- Brief log of recent completions with commit hashes
+```
+
+**Key rules:**
+- The Progress table is the single source of truth for what's done
+- Include review convergence info (how many rounds, which models)
+- Keep Recent Activity to the last ~2 phases (trim older entries)
+- Update Status line to reflect the current moment, not history
+
+## 11. Skill Improvement Feedback
+
+At each **phase completion**, include a short section in your `slack_notify`
+message noting any suggestions for improving the workflow, review, or
+external-models skills based on your experience during that phase. Examples:
+
+- "Review skill: the merge step would benefit from a severity tiebreaker rule
+  when models disagree"
+- "Workflow skill: should mention running `cargo clippy` before review rounds
+  for Rust projects"
+- "External models: Gemini's `-p` flag doesn't work with `--sandbox` on
+  files >500k"
+
+Keep it to 1-3 bullet points. Only flag things you actually encountered — don't
+speculate. The user will evaluate and fold useful feedback into the skills.
