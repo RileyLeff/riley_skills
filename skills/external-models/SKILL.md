@@ -152,12 +152,16 @@ write its review to a file.
 ```
 Task(
   subagent_type="general-purpose",
+  model="opus",
   run_in_background=true,
   prompt="Read the following codebase and review instructions, then write
     your review to $REVIEW_DIR/claude_output.txt using the Write tool.
     [contents of $REVIEW_DIR/prompt.txt]"
 )
 ```
+
+**Always specify `model="opus"`** for review subagents. Without it, the
+orchestrator may default to haiku, which is fast but too weak for catching bugs.
 
 ### Important
 - Subagents start with a clean context — they don't inherit your conversation

@@ -121,9 +121,11 @@ GEMINI_PID=$!
 
 **Claude subagent** (Task tool):
 
-Launch a `general-purpose` subagent with `run_in_background=true`. The prompt
-should include the full contents of `$REVIEW_DIR/prompt.txt` and instruct the
-subagent to write its review to `$REVIEW_DIR/claude_output.txt`.
+Launch a `general-purpose` subagent with `run_in_background=true` and
+`model="opus"`. The prompt should include the full contents of
+`$REVIEW_DIR/prompt.txt` and instruct the subagent to write its review to
+`$REVIEW_DIR/claude_output.txt`. **Always specify `model="opus"`** — without it,
+the orchestrator may default to haiku, which is too weak for bug-hunting.
 
 **Wait for all to complete:**
 ```bash
@@ -162,8 +164,9 @@ cat "$REVIEW_DIR/prompt.txt" | gemini -p "Follow the instructions in stdin." \
 
 #### If Claude subagent:
 
-Launch a `general-purpose` subagent via the Task tool with the prompt file
-content. Have it write its review to `$REVIEW_DIR/claude_output.txt`.
+Launch a `general-purpose` subagent via the Task tool with `model="opus"` and
+the prompt file content. Have it write its review to
+`$REVIEW_DIR/claude_output.txt`.
 
 ## Step 6: Merge Results (Parallel Mode Only)
 
