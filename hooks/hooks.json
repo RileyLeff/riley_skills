@@ -1,0 +1,29 @@
+{
+  "description": "Workflow-aware hooks: blocks plan mode during active workflows, injects workflow context before compaction.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "EnterPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/block-plan-mode.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/precompact-workflow.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
