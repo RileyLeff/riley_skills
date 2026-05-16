@@ -1,6 +1,3 @@
-## Slack
-When using slack_notify or slack_ask, use channel `C0AEMS2RC1L`.
-
 ## Versioning
 
 This is a Claude Code plugin. When committing changes that affect user-facing
