@@ -1,6 +1,6 @@
 ---
 name: review
-description: "Run a code review using parallel multi-model consensus (Codex + Gemini + Claude subagent) or a single model. Gathers codebase context with dirgrab, launches reviewers concurrently, merges findings, and presents structured results with graceful degradation."
+description: "Run a harness-neutral review using parallel external agents: Codex/GPT, Claude/Claude Code, Gemini, and fresh subagents where available. Use for code, specs, implementation plans, architecture boundaries, or workflow gates. Gathers context with dirgrab, launches reviewers concurrently, merges findings, files artifacts, and supports degraded-but-valid review rounds."
 ---
 
 # Code Review
@@ -17,17 +17,58 @@ directory.
 
 $ARGUMENTS
 
-## Step 0: Choose Mode
+## Step 0: Choose Mode And Panel
 
-**Parallel mode** (default): Run Codex, Gemini, and a Claude subagent
-concurrently against the full codebase, then merge findings. Use this when:
+**Parallel mode** (default): Run multiple external reviewers concurrently, then
+merge findings. Use this when:
 - The user says "review" without specifying a model
 - This review is invoked from the **workflow** skill
 - The user explicitly asks for "parallel review"
 
+An external reviewer is any fresh, independent agent context that did not just
+implement the change. Same-harness subagents count. Examples:
+
+- If Codex is orchestrating: launch a fresh Codex subagent or Codex CLI reviewer,
+  plus Claude Opus 4.7 and Gemini 3.1 Pro.
+- If Claude is orchestrating: launch a fresh Claude subagent, plus Codex GPT 5.5
+  and Gemini 3.1 Pro.
+- If only CLI tools are available: use Codex CLI, Claude CLI, and Gemini CLI.
+
+The target panel is three reviewers from as many model families as practical.
+Launch independent reviewers in parallel before waiting on any single one.
+
 **Single-model mode**: Run one model only. Use this when:
 - The user specifies a model ("codex review", "gemini review", "claude review")
 - Only one model is available (others rate-limited or not installed)
+
+Review types:
+- **code**: bugs, regressions, security, tests, production readiness
+- **spec-plan**: contradictions, missing contracts, private leakage, feasibility
+- **implementation-slice**: code vs spec/plan alignment, tests, no drift
+- **workflow**: process hazards, artifact quality, review-gate integrity
+
+## Step 0.5: Load Workflow Policy
+
+If `planning/workflow.toml` exists, read it before building the prompt. Include
+these fields in the review prompt and artifact header:
+
+- `backwards_compatibility_matters`
+- `compatibility_notes`
+- `use_github`
+- `comms.venue` and `comms.metadata` when relevant
+- `review.required_clean_rounds`, `review.allow_degraded_rounds`, and
+  `review.target_reviewers`
+
+Compatibility policy:
+
+- If `backwards_compatibility_matters = false`, reviewers should flag legacy
+  compatibility carryover, transitional shims, obsolete interfaces, and
+  pre-production baggage.
+- If `backwards_compatibility_matters = true`, reviewers should flag breaking
+  changes, migration gaps, API/data compatibility hazards, and upgrade risks.
+- If the field is absent, compatibility is unknown. Do not ask reviewers to
+  enforce no-legacy mode; ask them to identify compatibility-sensitive choices
+  that need a user decision.
 
 ## Step 1: Create Temp Directory
 
@@ -92,8 +133,27 @@ PROMPT_FOOTER
 
 Replace `[REVIEW_INSTRUCTION]` with the user's request, or use the default:
 "Review this codebase for architecture quality, potential bugs, security issues,
-and areas for improvement. Flag severity: major (must fix), minor (should fix),
-or note (observation/tradeoff). Provide specific file and function references."
+spec/plan drift, test gaps, and areas for improvement. Flag severity: P0/P1/P2
+or major (must fix), minor (should fix), or note (observation/tradeoff). Provide
+specific file and function references."
+
+Apply the compatibility policy from `planning/workflow.toml`:
+
+- If `backwards_compatibility_matters = false`, add: "Do not preserve legacy
+  compatibility or pre-production baggage. Flag any code that keeps
+  compatibility with old experiments, obsolete assumptions, abandoned
+  interfaces, or transitional paths that would not exist if we had known the
+  current spec/plan from the start."
+- If `backwards_compatibility_matters = true`, add: "Preserve compatibility for
+  real users/data/APIs. Flag breaking changes, missing migrations, data-loss
+  risks, undocumented API changes, and upgrade hazards."
+- If unset, add: "Compatibility policy is unknown. Flag compatibility-sensitive
+  decisions as questions/blockers rather than assuming old behavior can be
+  removed or must be preserved."
+
+For spec/plan reviews, include the relevant spec, implementation plan, private
+boundary notes if allowed, and the exact acceptance criteria. Ask reviewers to
+say explicitly whether they had enough context to assess the request.
 
 ## Step 5: Run Review
 
@@ -102,51 +162,79 @@ or note (observation/tradeoff). Provide specific file and function references."
 Launch all available models concurrently. Each writes to its own output file.
 Use background execution so they run simultaneously.
 
-**Codex** (background bash):
+**Codex GPT 5.5** (background bash):
 ```bash
-codex exec - \
+codex exec \
+  -m gpt-5.5 \
   --sandbox read-only \
   -o "$REVIEW_DIR/codex_output.txt" \
+  - \
   < "$REVIEW_DIR/prompt.txt" 2>&1 &
 CODEX_PID=$!
 ```
 Timeout: 600000ms.
 
-**Gemini** (background bash):
+**Gemini 3.1 Pro** (background bash):
 ```bash
-cat "$REVIEW_DIR/prompt.txt" | gemini -p "Follow the instructions in stdin." \
+cat "$REVIEW_DIR/prompt.txt" | gemini -m gemini-3.1-pro -p "Follow the instructions in stdin." \
   --sandbox -o text > "$REVIEW_DIR/gemini_output.txt" 2>&1 &
 GEMINI_PID=$!
 ```
 
-**Claude subagent** (Task tool):
+**Claude Opus 4.7 reviewer** (subagent or CLI):
 
-Launch a `general-purpose` subagent with `run_in_background=true` and
-`model="opus"`. The prompt should include the full contents of
-`$REVIEW_DIR/prompt.txt` and instruct the subagent to write its review to
-`$REVIEW_DIR/claude_output.txt`. **Always specify `model="opus"`** — without it,
-the orchestrator may default to haiku, which is too weak for bug-hunting.
+In Claude Code, launch a `general-purpose` subagent with
+`run_in_background=true` and `model="opus-4.7"`. The prompt should include the
+full contents of `$REVIEW_DIR/prompt.txt` and instruct the subagent to write its
+review to `$REVIEW_DIR/claude_output.txt`. **Always specify
+`model="opus-4.7"`** — without it, the orchestrator may default to haiku, which
+is too weak for bug-hunting.
+
+Outside Claude Code, use Claude CLI:
+
+```bash
+cat "$REVIEW_DIR/prompt.txt" | claude \
+  -p \
+  --model opus-4.7 \
+  --tools "" \
+  --output-format text \
+  > "$REVIEW_DIR/claude_output.txt" 2>&1 &
+CLAUDE_PID=$!
+```
+
+**Same-harness subagent:**
+
+If the current harness supports spawning subagents, prefer a fresh read-only
+subagent of the orchestrator's own family as one reviewer. Give it the same
+prompt and require a written output artifact. This still counts as external
+review because it starts from a clean context and did not implement the change.
 
 **Wait for all to complete:**
 ```bash
 wait $CODEX_PID 2>/dev/null; CODEX_EXIT=$?
 wait $GEMINI_PID 2>/dev/null; GEMINI_EXIT=$?
+if [ -n "${CLAUDE_PID:-}" ]; then wait $CLAUDE_PID 2>/dev/null; CLAUDE_EXIT=$?; fi
 ```
-Check the Claude subagent's background task output as well.
+Check any same-harness subagent output as well.
 
 **Check results:**
 - If a model exited non-zero or produced empty output, log the failure and
   continue with the others
 - At least one model must succeed for the round to be valid
 - If all three fail, report the errors and abort
+- A degraded round can count toward an exhaustive gate if at least one external
+  reviewer succeeded, but record the degradation and try to re-add failed
+  reviewers in the next round
 
 ### Single-Model Mode
 
 #### If Codex:
 ```bash
-codex exec - \
+codex exec \
+  -m gpt-5.5 \
   --sandbox read-only \
   -o "$REVIEW_DIR/codex_output.txt" \
+  - \
   < "$REVIEW_DIR/prompt.txt" 2>&1
 ```
 Timeout: 600000ms. May take 2-5 minutes.
@@ -158,15 +246,15 @@ inline prompt string, as Gemini CLI fails (exit 13) when stdin is large and the
 positional prompt arg is long.
 
 ```bash
-cat "$REVIEW_DIR/prompt.txt" | gemini -p "Follow the instructions in stdin." \
+cat "$REVIEW_DIR/prompt.txt" | gemini -m gemini-3.1-pro -p "Follow the instructions in stdin." \
   --sandbox -o text > "$REVIEW_DIR/gemini_output.txt" 2>&1
 ```
 
-#### If Claude subagent:
+#### If Claude:
 
-Launch a `general-purpose` subagent via the Task tool with `model="opus"` and
-the prompt file content. Have it write its review to
-`$REVIEW_DIR/claude_output.txt`.
+Launch a `general-purpose` subagent via the Task tool with `model="opus-4.7"`
+when inside Claude Code. Otherwise use Claude CLI with `--model opus-4.7` and
+`--tools ""`. Have it write its review to `$REVIEW_DIR/claude_output.txt`.
 
 ## Step 6: Merge Results (Parallel Mode Only)
 
@@ -185,6 +273,14 @@ list. This is done by you (the orchestrating Claude), not by an external model.
   (observation/tradeoff). If models disagree on severity, use the highest.
 - **Preserve specifics**: Keep file paths, line numbers, and function references
   from the most detailed report.
+- **Escalate uncertainty**: If a reviewer says it lacked context, or identifies
+  a genuine spec/plan inconsistency that cannot be resolved from project intent,
+  mark it as a blocker rather than smoothing it over.
+- **Compatibility policy check**: If backwards compatibility is disabled, treat
+  legacy-compatibility carryover, transitional scaffolding, or obsolete
+  experiment support as major. If compatibility is enabled, treat breaking
+  changes or missing migrations as major. If unknown, mark compatibility
+  questions as blockers when they affect acceptance.
 
 Write the merged output to `$REVIEW_DIR/merged_review.md`.
 
@@ -192,8 +288,12 @@ Write the merged output to `$REVIEW_DIR/merged_review.md`.
 ```markdown
 # Review Round — [date]
 
-**Models**: Codex, Gemini, Claude (or whichever participated)
+**Review Type**: code | spec-plan | implementation-slice | workflow
+**Backwards Compatibility Matters**: true | false | unknown
+**Models**: Codex/GPT, Gemini, Claude, same-harness subagent (or whichever participated)
+**Degraded**: no | yes — reason
 **Context**: ~Nk tokens
+**Clean Result**: clean | not clean | blocked
 
 ## Findings
 
@@ -239,6 +339,15 @@ round used Gemini + Claude only").
 
 **Single-model mode**: Read and present the model's output directly.
 
+Clean means:
+- no P0/P1/P2 or major findings
+- no failing required tests or required validation gaps
+- no unresolved spec/implementation-plan contradictions
+- no unresolved data/security/privacy boundary findings
+- compatibility policy satisfied, or compatibility policy unknown and no
+  compatibility-sensitive blocker remains
+- no reviewer reported insufficient context for the requested judgment
+
 ## Step 9: Follow-up (Optional)
 
 If the user has follow-up questions, resume the relevant model's session.
@@ -246,13 +355,13 @@ If the user has follow-up questions, resume the relevant model's session.
 ### Codex follow-up:
 ```bash
 SESSION_ID=$(cat "$REVIEW_DIR/codex_session_id")
-codex exec resume "$SESSION_ID" "follow-up question" --sandbox read-only 2>&1
+codex exec resume -m gpt-5.5 "$SESSION_ID" "follow-up question" 2>&1
 ```
 
 ### Gemini follow-up:
 ```bash
 SESSION_ID=$(cat "$REVIEW_DIR/gemini_session_id")
-echo "follow-up question" | gemini -r "$SESSION_ID" --sandbox -o text 2>&1
+echo "follow-up question" | gemini -m gemini-3.1-pro -r "$SESSION_ID" --sandbox -o text 2>&1
 ```
 
 Follow-ups are mostly relevant for single-model mode. In parallel mode, the
@@ -280,8 +389,8 @@ External models can hit rate limits or fail. Handle this without stopping:
 |-----------|--------|
 | Codex rate-limited or fails | Drop Codex, continue with Gemini + Claude |
 | Gemini rate-limited or fails | Drop Gemini, continue with Codex + Claude |
-| Both external models fail | Claude subagent only (always available, no rate limits, no API cost) |
-| Claude subagent fails | This shouldn't happen (in-process), but fall back to whichever external model is available |
+| Claude unavailable/fails | Continue with Codex/GPT + Gemini or whichever external reviewers remain |
+| Only one reviewer type succeeds | Valid but degraded; record it, keep the two-clean-round gate, and try to restore the full panel next round |
 
 Log which models participated in each round. If degraded, note it when
 presenting results so the user knows the round had reduced coverage.

@@ -1,13 +1,13 @@
 ---
 name: external-models
-description: "Reference for invoking external AI models (Codex, Gemini, or Claude). Capabilities, flags, strengths, weaknesses, and invocation patterns. Use when you need to shell out to another model for reviews, multimodal analysis, agent tasks, or any cross-model collaboration."
+description: "Reference for invoking external AI models and fresh reviewer agents (Codex/GPT, Gemini, Claude/Claude Code). Capabilities, flags, strengths, weaknesses, and invocation patterns. Use when you need to shell out to another model, spawn same-harness reviewers, run reviews, do multimodal analysis, or coordinate cross-model collaboration."
 ---
 
 # External Model Reference
 
 ## Codex CLI
 
-**Model**: gpt-5.3-codex, reasoning level xhigh (configured as default in `~/.codex/config.toml`)
+**Model**: gpt-5.5, reasoning level xhigh
 **Context**: ~258k tokens with excellent auto-compact
 
 ### Strengths
@@ -28,17 +28,17 @@ description: "Reference for invoking external AI models (Codex, Gemini, or Claud
 
 **Read-only review** (most common):
 ```bash
-codex exec - --sandbox read-only -o "$REVIEW_DIR/output.txt" < "$REVIEW_DIR/prompt.txt" 2>&1
+codex exec -m gpt-5.5 --sandbox read-only -o "$REVIEW_DIR/output.txt" - < "$REVIEW_DIR/prompt.txt" 2>&1
 ```
 
 **Write access** (for edits, test writing, bug fixing):
 ```bash
-codex exec - --sandbox workspace-write -o "$REVIEW_DIR/output.txt" < "$REVIEW_DIR/prompt.txt" 2>&1
+codex exec -m gpt-5.5 --sandbox workspace-write -o "$REVIEW_DIR/output.txt" - < "$REVIEW_DIR/prompt.txt" 2>&1
 ```
 
 **Resume a session** (follow-up with a specific session ID):
 ```bash
-codex exec resume "$SESSION_ID" "follow-up question" --sandbox read-only 2>&1
+codex exec resume -m gpt-5.5 "$SESSION_ID" "follow-up question" 2>&1
 ```
 
 ### Key Flags
@@ -46,7 +46,7 @@ codex exec resume "$SESSION_ID" "follow-up question" --sandbox read-only 2>&1
 - `--sandbox read-only` : prevent writes
 - `--sandbox workspace-write` : allow edits to project files
 - `-o <file>` : capture final response to file
-- Model/effort configured in `~/.codex/config.toml`, no need to pass as flags
+- `-m gpt-5.5` : use GPT 5.5 for serious review and implementation passes
 
 ### Important
 - **Never** pass `--full-auto`
@@ -58,8 +58,7 @@ codex exec resume "$SESSION_ID" "follow-up question" --sandbox read-only 2>&1
 
 ## Gemini CLI
 
-**Model**: Default (no `-m` flag needed) — auto-routes between Gemini 3 Pro and Flash
-**Explicit models**: `gemini-3-pro-preview`, `gemini-3-flash-preview` (only to force one)
+**Model**: gemini-3.1-pro for serious review work
 **Context**: 1M tokens, but quality degrades around ~400k tokens
 
 ### Strengths
@@ -83,24 +82,25 @@ Codex pattern), then pipe it. Keep the `-p` arg short — Gemini CLI fails
 (exit 13) when stdin is large and the inline prompt string is long.
 
 ```bash
-cat "$REVIEW_DIR/prompt.txt" | gemini -p "Follow the instructions in stdin." \
+cat "$REVIEW_DIR/prompt.txt" | gemini -m gemini-3.1-pro -p "Follow the instructions in stdin." \
   --sandbox -o text > "$REVIEW_DIR/output.txt" 2>&1
 ```
 
 **Multimodal analysis** (images, documents):
 ```bash
-gemini "Analyze this image: [description of what to look for]" --sandbox -o text < image.png 2>&1
+gemini -m gemini-3.1-pro "Analyze this image: [description of what to look for]" --sandbox -o text < image.png 2>&1
 ```
 
 **Resume a session** (follow-up with a specific session ID):
 ```bash
-echo "follow-up" | gemini -r "$SESSION_ID" --sandbox -o text 2>&1
+echo "follow-up" | gemini -m gemini-3.1-pro -r "$SESSION_ID" --sandbox -o text 2>&1
 ```
 
 ### Key Flags
 - `--sandbox` : OS-level write restriction (Seatbelt on macOS)
 - `-o text` : readable output format
 - `-r <UUID>` : resume a specific session by ID (prefer over `latest`)
+- `-m gemini-3.1-pro` : use Gemini 3.1 Pro for serious review work
 - `-p` : non-interactive headless mode
 - No `--yolo` or `-y` — never auto-approve tool calls
 
@@ -116,20 +116,18 @@ echo "follow-up" | gemini -r "$SESSION_ID" --sandbox -o text 2>&1
 
 ---
 
-## Claude
+## Claude / Claude Code
 
-**Model**: opus-4.6
+**Model**: opus-4.7
 **Training cutoff**: May 2025
 
-If you are a claude model, consider using sub-agents instead of full-fat
-separate instances of claude code. If you aren't, consider using claude in cases
-that require high-fidelity tool use and agentic behavior. As of Opus 4.6,
-Claude is approximately as smart as OpenAI's Codex 5.3 with xhigh reasoning
-level, but Claude is drastically faster, and can iterate more rapidly as a
-result.
+If you are in Claude Code, prefer fresh Claude subagents for same-family review.
+If you are in Codex or another harness, use Claude CLI when available. In either
+case, the reviewer counts as external only if it starts from a clean context and
+did not implement the change under review.
 
 ### Strengths
-- Always available — no external API, no rate limits, no cost
+- Generally available inside Claude Code as a fresh subagent
 - Starts fresh as a subagent without implementation bias (good for reviewing
   code you just wrote)
 - Fast — no network round-trip to an external CLI
@@ -152,7 +150,7 @@ write its review to a file.
 ```
 Task(
   subagent_type="general-purpose",
-  model="opus",
+  model="opus-4.7",
   run_in_background=true,
   prompt="Read the following codebase and review instructions, then write
     your review to $REVIEW_DIR/claude_output.txt using the Write tool.
@@ -160,8 +158,30 @@ Task(
 )
 ```
 
-**Always specify `model="opus"`** for review subagents. Without it, the
+**Always specify `model="opus-4.7"`** for review subagents. Without it, the
 orchestrator may default to haiku, which is fast but too weak for catching bugs.
+
+**Claude CLI read-only review** (when outside Claude Code or when a separate
+Claude process is preferred):
+
+```bash
+cat "$REVIEW_DIR/prompt.txt" | claude \
+  -p \
+  --model opus-4.7 \
+  --tools "" \
+  --output-format text \
+  > "$REVIEW_DIR/claude_output.txt" 2>&1
+```
+
+**Claude CLI tool-assisted pass** (only when you intentionally want it to
+explore files itself):
+
+```bash
+claude \
+  --add-dir "$PWD" \
+  --model opus-4.7 \
+  -p "Review this repository for bugs and architectural risks."
+```
 
 ### Important
 - Subagents start with a clean context — they don't inherit your conversation
@@ -169,6 +189,8 @@ orchestrator may default to haiku, which is fast but too weak for catching bugs.
 - For parallel reviews, launch the subagent with `run_in_background=true` so it
   runs concurrently with Codex and Gemini
 - The subagent has access to Read/Write/Glob/Grep tools but not Bash by default
+- For isolated CLI review rounds, prefer `--tools ""` when the full context is
+  already in the prompt so the review stays deterministic
 
 When orchestrating multi-model work, defer to this file for correct model names
 and invocation patterns. If something here looks outdated or you find a mismatch
@@ -189,5 +211,5 @@ and suggest filing an issue or PR at this skill's
 | Multimodal (images, docs, OCR) | Gemini | Best multimodal by far |
 | Long-context analysis | Gemini | 1M context window |
 | Test writing | Codex (write mode) | Good at following test conventions |
-| Implementation | Claude | Smart and faster than codex, faster iteration |
+| Implementation | Orchestrator's native harness | Keep implementation local; use external reviewers after |
 | Quick second opinion | Gemini | Fast, low-effort |

@@ -25,7 +25,7 @@ claude plugin update riley-skills@riley-skills
 Some skills depend on external tools:
 
 - **review** and **dirgrab** need [dirgrab](https://github.com/rileyleff/dirgrab) installed (`brew tap rileyleff/rileytap && brew install dirgrab` or `cargo install dirgrab`)
-- **review** needs [Codex CLI](https://github.com/openai/codex) and/or [Gemini CLI](https://github.com/google-gemini/gemini-cli) installed
+- **review** works best with Codex CLI, Claude/Claude Code, and [Gemini CLI](https://github.com/google-gemini/gemini-cli) available, but degrades gracefully when one reviewer is rate-limited or unavailable
 - **slack-notify** needs [uv](https://docs.astral.sh/uv/) installed and a `SLACK_BOT_TOKEN` env var set (see the [workflow skill](skills/workflow/SKILL.md#5-human-checkpoints--notifications) for setup details)
 
 ## Contents
@@ -42,11 +42,11 @@ Both tools accept an optional `channel` parameter. If not provided, they fall ba
 
 #### workflow
 
-Encodes my full development process for larger projects: read an architecture plan, break it into steps, implement with atomic commits, run multi-model review loops, fix bugs until clean, and notify the human at checkpoints. Designed for hands-off autonomous work, you give it a plan (specific architectural ideas) and a "soul document" (describing your overall intent), it does the rest. Getting frequent external reviews, clearing out old stuff, and pausing at major checkpoints for extensive bugfixes generally enables projects to scale a little larger if they have solid foundations. Once it's in, try the project yourself, add a new architecture file if necessary, and repeat. Will keep refining this over time.
+Encodes my full development process for larger projects: read an architecture plan, load `planning/workflow.toml` policy knobs, break the work into steps, implement with atomic commits, run multi-model review loops, fix bugs until clean, and notify the human at checkpoints. Designed for hands-off autonomous work, you give it a plan (specific architectural ideas) and a "soul document" (describing your overall intent), it does the rest. Getting frequent external reviews, clearing out old stuff when compatibility policy allows it, and pausing at major checkpoints for extensive bugfixes generally enables projects to scale a little larger if they have solid foundations. Once it's in, try the project yourself, add a new architecture file if necessary, and repeat. Will keep refining this over time.
 
 #### review
 
-Runs a code review using an external model (Codex or Gemini). Gathers codebase context with dirgrab, ships it off in a read-only sandbox, and brings back structured results. Supports follow-up sessions so the reviewer keeps its context. Built to avoid multi-agent collisions, let me know if you run into any issues with it.
+Runs code, spec, implementation-plan, or workflow reviews using parallel external reviewers: Codex/GPT, Claude/Claude Code, Gemini, and fresh same-harness subagents where available. Gathers context with dirgrab, ships it off in read-only sandboxes or clean subagent contexts, and brings back structured results. Built to avoid multi-agent collisions, let me know if you run into any issues with it.
 
 #### external-models
 
