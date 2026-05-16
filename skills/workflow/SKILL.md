@@ -151,9 +151,16 @@ Claude subagent plus Codex and Gemini. The review skill handles context
 gathering, parallel invocation, merging, degradation, and safety flags.
 
 For the review prompt, include: what changed, what to look for, and a reference
-to the architecture plan and `planning/workflow.toml`. Ask the reviewers to
-flag severity: P0/P1/P2 or major (must fix), minor (should fix), or note
-(observation/tradeoff).
+to the architecture plan and `planning/workflow.toml`. For implementation-slice
+reviews, also include the full public spec, the full implementation plan, the
+full relevant codebase snapshot, and a short prompt explaining what this section
+was supposed to accomplish. Ask the reviewers to flag severity: P0/P1/P2 or
+major (must fix), minor (should fix), or note (observation/tradeoff).
+
+Every implementation-slice and milestone review must explicitly ask whether the
+work is materially implemented versus merely scaffolded, mocked, fixture-driven,
+or shaped to satisfy superficial tests. A review is not clean if reviewers lacked
+the spec, implementation plan, code, or task intent needed to judge that.
 
 Pass the compatibility policy into every review prompt:
 
@@ -220,15 +227,16 @@ Graceful Degradation section for details.
 
 At **major milestones** (completing a phase, finishing all steps, pre-release):
 
-1. Run a **parallel multi-model review** of the entire relevant codebase (not
-   just recent diff)
+1. Run a **parallel multi-model review** of the full relevant codebase against
+   the full public spec, implementation plan, workflow policy, and a prompt that
+   states what the milestone was supposed to deliver.
 2. Fix everything found
 3. Run another parallel review
 4. **Repeat until you get 2 consecutive clean valid rounds.** Clean means no
    P0/P1/P2 or major findings, no required test failures, no unresolved
    spec/plan contradictions, no unresolved security/privacy/data-boundary
-   issues, and no reviewer saying there was insufficient context for the
-   requested judgment.
+   issues, no mock-only/scaffold-only/reward-hacked implementation gaps, and no
+   reviewer saying there was insufficient context for the requested judgment.
 5. If a round is degraded because a reviewer hit rate limits or failed, it may
    still count if at least one external reviewer succeeded and the result is
    clean. Label it degraded, keep trying to restore the full panel, and do not

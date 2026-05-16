@@ -44,7 +44,8 @@ Launch independent reviewers in parallel before waiting on any single one.
 Review types:
 - **code**: bugs, regressions, security, tests, production readiness
 - **spec-plan**: contradictions, missing contracts, private leakage, feasibility
-- **implementation-slice**: code vs spec/plan alignment, tests, no drift
+- **implementation-slice**: code vs spec/plan alignment, tests, no drift,
+  no reward hacking, no mock-only implementation hidden behind passing tests
 - **workflow**: process hazards, artifact quality, review-gate integrity
 
 ## Step 0.5: Load Workflow Policy
@@ -154,6 +155,30 @@ Apply the compatibility policy from `planning/workflow.toml`:
 For spec/plan reviews, include the relevant spec, implementation plan, private
 boundary notes if allowed, and the exact acceptance criteria. Ask reviewers to
 say explicitly whether they had enough context to assess the request.
+
+For implementation-slice and milestone reviews, the prompt must include all of:
+
+- the full public spec or the largest relevant unredacted excerpt if the
+  codebase exceeds model context
+- the full implementation plan or the largest relevant unredacted excerpt if
+  the codebase exceeds model context
+- the full relevant codebase snapshot, not just the diff
+- the workflow policy from `planning/workflow.toml`
+- a short task prompt explaining what the orchestrating agent is trying to
+  implement in this section, what changed, and what "done" is supposed to mean
+
+Ask reviewers to explicitly answer:
+
+1. Does the implementation materially satisfy the spec and implementation plan,
+   or is it only scaffolding/mocks/placeholders?
+2. Are there tests or demos that merely prove the scaffolding works while core
+   product behavior remains unimplemented?
+3. Did the code introduce shortcuts, fake adapters, reward-hacking fixtures, or
+   TODO-shaped gaps that should block acceptance?
+4. Is the implementation the clean production shape implied by the current
+   spec/plan and workflow compatibility policy?
+5. Did the reviewer have enough spec, plan, code, and task context to make this
+   judgment? If not, the round is not clean.
 
 ## Step 5: Run Review
 
