@@ -14,7 +14,7 @@ and human-in-the-loop checkpoints.
 ```
 Architecture Plan (.md)
   → Step-by-step implementation (atomic commits)
-    → Parallel review round (same-harness subagent + Codex/GPT + Claude + Gemini, merge, fix)
+    → Parallel review round (Codex/GPT + Claude + Gemini, one reviewer per family, merge, fix)
       → Exhaustive review at milestones (parallel loop until clean)
         → Human checkpoint (notify + wait)
           → Next phase or architecture revision
@@ -72,7 +72,7 @@ metadata = { slack_channel_id = "C0123456789" }
 [review]
 required_clean_rounds = 2
 allow_degraded_rounds = true
-target_reviewers = ["same_harness", "codex", "claude", "gemini"]
+target_reviewers = ["codex", "claude", "gemini"]
 ```
 
 Compatibility policy:
@@ -113,9 +113,9 @@ For each step:
 - **Parallelize deliberately.** At the start of substantial work, identify
   independent side tasks that can run in parallel: codebase exploration,
   focused implementation with disjoint write sets, fixture/test generation,
-  spec cross-checks, and external review. Same-harness subagents count as
-  external agents when they start from a fresh context and did not implement the
-  change under review.
+  spec cross-checks, and external review. Fresh subagents in the current harness
+  may fill the orchestrator's model-family review slot when they start from a
+  fresh context and did not implement the change under review.
 - **Organize your work into atomic commits.** Each commit is one logical change. Don't bundle unrelated work. If a step touches 5 files for one feature that's one commit.
   If it's two independent things, two commits.
 - **Commit after each meaningful unit of work**, not just at the end of a step.
@@ -143,12 +143,13 @@ For each step:
 After completing a step, run a **parallel multi-model review** using the
 **review** skill (`skills/review/SKILL.md` in this plugin). By default, this
 launches available external reviewers concurrently, then merges their findings
-into a single prioritized list. The target panel is a fresh same-harness
-subagent plus reviewers from the Codex/GPT, Claude, and Gemini families when
-available. If the orchestrator is Codex, use a fresh Codex subagent or Codex CLI
-reviewer plus Claude and Gemini. If the orchestrator is Claude, use a fresh
-Claude subagent plus Codex and Gemini. The review skill handles context
-gathering, parallel invocation, merging, degradation, and safety flags.
+into a single prioritized list. The target panel is exactly one fresh reviewer
+from each of the Codex/GPT, Claude, and Gemini families when available. If the
+orchestrator can spawn a fresh subagent from its own family, that subagent fills
+that family slot; do not also launch a separate external CLI reviewer from the
+same family unless the user explicitly asks for redundancy. The review skill
+handles context gathering, parallel invocation, merging, degradation, and safety
+flags.
 
 For the review prompt, include: what changed, what to look for, and a reference
 to the architecture plan and `planning/workflow.toml`. For implementation-slice
@@ -372,8 +373,8 @@ For model capabilities, invocation flags, and selection guidance, read the
 
 Key uses within a workflow session:
 - **Post-implementation review**: Use the **review** skill — runs a fresh
-  same-harness subagent plus Codex/GPT, Claude, and Gemini reviewers in parallel
-  when available
+  Codex/GPT, Claude, and Gemini reviewer in parallel when available, with at
+  most one reviewer per model family
 - **Test writing**: Codex with `--sandbox workspace-write`
 - **Targeted bug hunting**: Codex pointed at a specific subsystem
 - **Large codebase review**: Gemini for its 1M context window

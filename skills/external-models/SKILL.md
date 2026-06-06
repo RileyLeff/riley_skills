@@ -1,6 +1,6 @@
 ---
 name: external-models
-description: "Reference for invoking external AI models and fresh reviewer agents (Codex/GPT, Gemini, Claude/Claude Code). Capabilities, flags, strengths, weaknesses, and invocation patterns. Use when you need to shell out to another model, spawn same-harness reviewers, run reviews, do multimodal analysis, or coordinate cross-model collaboration."
+description: "Reference for invoking external AI models and fresh reviewer agents (Codex/GPT, Claude/Claude Code, Gemini via Antigravity CLI). Capabilities, flags, strengths, weaknesses, and invocation patterns. Use when you need to shell out to another model, run reviews, do multimodal analysis, or coordinate one-reviewer-per-family collaboration."
 ---
 
 # External Model Reference
@@ -22,43 +22,62 @@ description: "Reference for invoking external AI models and fresh reviewer agent
 - Can take a very long time on large prompts
 
 ### Notes
-- No `--approval-mode` flag — use `--sandbox` instead
+- No `--approval-mode` flag. Use `--sandbox` and put global approval flags
+  before `exec`.
 
 ### Invocation Patterns
 
 **Read-only review** (most common):
 ```bash
-codex exec -m gpt-5.5 --sandbox read-only -o "$REVIEW_DIR/output.txt" - < "$REVIEW_DIR/prompt.txt" 2>&1
+codex -a never exec \
+  -m gpt-5.5 \
+  --sandbox read-only \
+  --ephemeral \
+  -C "$PWD" \
+  -o "$REVIEW_DIR/output.txt" \
+  - \
+  < "$REVIEW_DIR/prompt.txt" > "$REVIEW_DIR/codex_log.txt" 2>&1
 ```
 
 **Write access** (for edits, test writing, bug fixing):
 ```bash
-codex exec -m gpt-5.5 --sandbox workspace-write -o "$REVIEW_DIR/output.txt" - < "$REVIEW_DIR/prompt.txt" 2>&1
+codex -a never exec \
+  -m gpt-5.5 \
+  --sandbox workspace-write \
+  --ephemeral \
+  -C "$PWD" \
+  -o "$REVIEW_DIR/output.txt" \
+  - \
+  < "$REVIEW_DIR/prompt.txt" > "$REVIEW_DIR/codex_log.txt" 2>&1
 ```
 
-**Resume a session** (follow-up with a specific session ID):
+**Resume a non-ephemeral session** (follow-up with a specific session ID):
 ```bash
-codex exec resume -m gpt-5.5 "$SESSION_ID" "follow-up question" 2>&1
+codex -a never exec resume -m gpt-5.5 "$SESSION_ID" "follow-up question" 2>&1
 ```
 
 ### Key Flags
+- `-a never` : global approval policy flag; place before `exec`
 - `-` : read prompt from stdin (always use this — never pass large prompts as args)
 - `--sandbox read-only` : prevent writes
 - `--sandbox workspace-write` : allow edits to project files
+- `--ephemeral` : avoid persistent session/state collisions for one-off reviews
+- `-C "$PWD"` : run against the intended project directory
 - `-o <file>` : capture final response to file
 - `-m gpt-5.5` : use GPT 5.5 for serious review and implementation passes
 
 ### Important
 - **Never** pass `--full-auto`
 - **Always** build prompts as files, pipe via stdin (`< file`), not as shell arguments
-- Sessions persist automatically; resume by UUID (see review skill) to avoid collisions
+- The review commands shown above use `--ephemeral`. Drop it deliberately only
+  when you want a resumable Codex session and have a collision-safe plan.
 - Can take 2-5 minutes on large codebases — use generous timeouts (600000ms)
 
 ---
 
-## Gemini CLI
+## Gemini via Antigravity CLI (`agy`)
 
-**Model**: gemini-3.1-pro for serious review work
+**Model**: `Gemini 3.1 Pro (High)` for serious review work
 **Context**: 1M tokens, but quality degrades around ~400k tokens
 
 ### Strengths
@@ -72,59 +91,67 @@ codex exec resume -m gpt-5.5 "$SESSION_ID" "follow-up question" 2>&1
 - Will try to write even when told read-only (hence the sandbox flag)
 - Not great at agentic search
 - Quality degrades with very large context even though window allows it
+- Positional prompt arguments can route to the wrong model; stdin is reliable
+- No tested persistent-session workflow for review follow-ups
 
 ### Invocation Patterns
 
 **Read-only review** (build prompt file, pipe via stdin):
 
-Build a prompt file containing the full codebase + instructions (same as the
-Codex pattern), then pipe it. Keep the `-p` arg short — Gemini CLI fails
-(exit 13) when stdin is large and the inline prompt string is long.
-
 ```bash
-cat "$REVIEW_DIR/prompt.txt" | gemini -m gemini-3.1-pro -p "Follow the instructions in stdin." \
-  --sandbox -o text > "$REVIEW_DIR/output.txt" 2>&1
+agy --print \
+  --sandbox \
+  --model 'Gemini 3.1 Pro (High)' \
+  --print-timeout 10m \
+  < "$REVIEW_DIR/prompt.txt" \
+  > "$REVIEW_DIR/gemini_output.txt" 2>&1
 ```
 
-**Multimodal analysis** (images, documents):
+**Quick smoke test**:
 ```bash
-gemini -m gemini-3.1-pro "Analyze this image: [description of what to look for]" --sandbox -o text < image.png 2>&1
-```
-
-**Resume a session** (follow-up with a specific session ID):
-```bash
-echo "follow-up" | gemini -m gemini-3.1-pro -r "$SESSION_ID" --sandbox -o text 2>&1
+printf 'Reply exactly: agy smoke ok' | agy --print \
+  --sandbox \
+  --model 'Gemini 3.1 Pro (Low)' \
+  --print-timeout 60s
 ```
 
 ### Key Flags
+- `--print` : non-interactive mode
 - `--sandbox` : OS-level write restriction (Seatbelt on macOS)
-- `-o text` : readable output format
-- `-r <UUID>` : resume a specific session by ID (prefer over `latest`)
-- `-m gemini-3.1-pro` : use Gemini 3.1 Pro for serious review work
-- `-p` : non-interactive headless mode
-- No `--yolo` or `-y` — never auto-approve tool calls
+- `--model 'Gemini 3.1 Pro (High)'` : use Gemini 3.1 Pro for serious review work
+- `--print-timeout 10m` : allow enough time for large review prompts
+- No `--output-format` / `-o` flag in `agy`
+- No `--yolo` or `-y` - never auto-approve tool calls
 
 ### Important
-- **Always** provide full codebase via stdin (dirgrab output) — Gemini is bad at
-  agentic file discovery
+- **Always** provide full codebase via stdin (dirgrab output) - Gemini is bad at
+  agentic file discovery, and `agy` positional prompts have been unreliable
 - **Always** use `--sandbox` on every invocation
 - **Always** include read-only instructions in the prompt (belt and suspenders
   with sandbox)
 - dirgrab includes untracked files by default — no need to commit first (only
   `--tracked-only` mode skips uncommitted files)
-- Sessions persist; resume by UUID (see review skill) to avoid collisions
+- Do not use the legacy `gemini` CLI model strings here for serious reviews
+  unless you have re-tested them locally. Use `agy` for Gemini 3.1 Pro.
+- `agy` output may include stray copied flag text; keep the sandbox anyway and
+  merge findings based on substance.
 
 ---
 
 ## Claude / Claude Code
 
-**Model**: opus-4.7
+**Model**: use the rolling Opus alias, `--model opus`
 **Training cutoff**: May 2025
 
-If you are in Claude Code, prefer fresh Claude subagents for same-family review.
-If you are in Codex or another harness, use Claude CLI when available. In either
-case, the reviewer counts as external only if it starts from a clean context and
-did not implement the change under review.
+As of Claude Code 2.1.167, `--model opus` resolves to
+`claude-opus-4-8` (Claude Opus 4.8). Prefer the alias so this skill does not
+need to chase Anthropic point releases. The tested CLI does not support a
+standalone `--opus` flag.
+
+If you are in Claude Code, prefer fresh Claude subagents to fill the Claude
+review slot. If you are in Codex or another harness, use Claude CLI when
+available. In either case, the reviewer counts only if it starts from a clean
+context and did not implement the change under review.
 
 ### Strengths
 - Generally available inside Claude Code as a fresh subagent
@@ -137,7 +164,7 @@ did not implement the change under review.
 - As the implementer, a Claude subagent shares your training data and biases —
   it may have the same blind spots you do (this is why multi-model review is
   valuable)
-- No persistent session for follow-ups (unlike Codex/Gemini)
+- No persistent session for follow-ups in the recommended review flow
 
 ### Invocation Patterns
 
@@ -150,7 +177,7 @@ write its review to a file.
 ```
 Task(
   subagent_type="general-purpose",
-  model="opus-4.7",
+  model="opus",
   run_in_background=true,
   prompt="Read the following codebase and review instructions, then write
     your review to $REVIEW_DIR/claude_output.txt using the Write tool.
@@ -158,18 +185,22 @@ Task(
 )
 ```
 
-**Always specify `model="opus-4.7"`** for review subagents. Without it, the
+**Always specify `model="opus"`** for review subagents. Without it, the
 orchestrator may default to haiku, which is fast but too weak for catching bugs.
 
 **Claude CLI read-only review** (when outside Claude Code or when a separate
 Claude process is preferred):
 
 ```bash
-cat "$REVIEW_DIR/prompt.txt" | claude \
-  -p \
-  --model opus-4.7 \
+claude \
+  --print \
+  --model opus \
+  --permission-mode plan \
   --tools "" \
+  --no-session-persistence \
+  --max-budget-usd 5 \
   --output-format text \
+  < "$REVIEW_DIR/prompt.txt" \
   > "$REVIEW_DIR/claude_output.txt" 2>&1
 ```
 
@@ -179,8 +210,9 @@ explore files itself):
 ```bash
 claude \
   --add-dir "$PWD" \
-  --model opus-4.7 \
-  -p "Review this repository for bugs and architectural risks."
+  --model opus \
+  --print \
+  "Review this repository for bugs and architectural risks."
 ```
 
 ### Important

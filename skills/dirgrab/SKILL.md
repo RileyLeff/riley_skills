@@ -202,8 +202,9 @@ enabled = true
 REVIEW_DIR=$(mktemp -d /tmp/review-XXXXXXXX)
 dirgrab --no-tree -e '*.lock,planning/' -o "$REVIEW_DIR/context.txt" -s
 
-# Pipe to Gemini CLI
-dirgrab -c --no-tree -e '*.lock' && gemini "review this code"
+# Pipe context into agy / Gemini
+dirgrab --no-tree -e '*.lock' -o "$REVIEW_DIR/context.txt" -s
+agy --print --sandbox --model 'Gemini 3.1 Pro (High)' < "$REVIEW_DIR/context.txt"
 
 # Check token budget before committing to an expensive model call
 dirgrab -s --no-tree -e '*.lock' 2>&1 | tail -5

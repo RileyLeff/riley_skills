@@ -25,7 +25,7 @@ claude plugin update riley-skills@riley-skills
 Some skills depend on external tools:
 
 - **review** and **dirgrab** need [dirgrab](https://github.com/rileyleff/dirgrab) installed (`brew tap rileyleff/rileytap && brew install dirgrab` or `cargo install dirgrab`)
-- **review** works best with Codex CLI, Claude/Claude Code, and [Gemini CLI](https://github.com/google-gemini/gemini-cli) available, but degrades gracefully when one reviewer is rate-limited or unavailable
+- **review** works best with Codex CLI, Claude/Claude Code, and Antigravity CLI (`agy`) for Gemini available, but degrades gracefully when one reviewer is rate-limited or unavailable
 - **slack-notify** needs [uv](https://docs.astral.sh/uv/) installed and a `SLACK_BOT_TOKEN` env var set (see the [workflow skill](skills/workflow/SKILL.md#5-human-checkpoints--notifications) for setup details)
 
 ## Contents
@@ -46,7 +46,7 @@ Encodes my full development process for larger projects: read an architecture pl
 
 #### review
 
-Runs code, spec, implementation-plan, or workflow reviews using parallel external reviewers: Codex/GPT, Claude/Claude Code, Gemini, and fresh same-harness subagents where available. Gathers context with dirgrab, ships it off in read-only sandboxes or clean subagent contexts, and brings back structured results. Built to avoid multi-agent collisions, let me know if you run into any issues with it.
+Runs code, spec, implementation-plan, or workflow reviews using one fresh reviewer from each available model family: Codex/GPT, Claude/Claude Code, and Gemini via `agy`. Gathers context with dirgrab, ships it off in read-only sandboxes or clean subagent contexts, and brings back structured results. Built to avoid multi-agent collisions, let me know if you run into any issues with it.
 
 #### external-models
 

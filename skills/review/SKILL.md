@@ -1,6 +1,6 @@
 ---
 name: review
-description: "Run a harness-neutral review using parallel external agents: Codex/GPT, Claude/Claude Code, Gemini, and fresh subagents where available. Use for code, specs, implementation plans, architecture boundaries, or workflow gates. Gathers context with dirgrab, launches reviewers concurrently, merges findings, files artifacts, and supports degraded-but-valid review rounds."
+description: "Run a harness-neutral review using parallel fresh reviewers from the Codex/GPT, Claude/Claude Code, and Gemini model families. Use for code, specs, implementation plans, architecture boundaries, or workflow gates. Gathers context with dirgrab, launches reviewers concurrently, merges findings, files artifacts, and supports degraded-but-valid review rounds."
 ---
 
 # Code Review
@@ -25,16 +25,27 @@ merge findings. Use this when:
 - This review is invoked from the **workflow** skill
 - The user explicitly asks for "parallel review"
 
-An external reviewer is any fresh, independent agent context that did not just
-implement the change. Same-harness subagents count. Examples:
+The default target panel is exactly one fresh reviewer from each model family:
 
-- If Codex is orchestrating: launch a fresh Codex subagent or Codex CLI reviewer,
-  plus Claude Opus 4.7 and Gemini 3.1 Pro.
-- If Claude is orchestrating: launch a fresh Claude subagent, plus Codex GPT 5.5
-  and Gemini 3.1 Pro.
-- If only CLI tools are available: use Codex CLI, Claude CLI, and Gemini CLI.
+- Codex/GPT
+- Claude/Claude Code
+- Gemini
 
-The target panel is three reviewers from as many model families as practical.
+The orchestrating implementer never counts as a reviewer. A fresh subagent in
+the current harness is a transport choice for filling that harness's
+model-family slot, not a fourth reviewer. Never run both a same-family subagent
+and an external CLI reviewer for that same family unless the user explicitly
+asks for redundancy.
+
+Examples:
+
+- If Codex is orchestrating: fill the Codex/GPT slot with a fresh Codex subagent
+  or Codex CLI reviewer, then add Claude Opus via Claude CLI and Gemini via
+  `agy`.
+- If Claude is orchestrating: fill the Claude slot with a fresh Claude subagent
+  or Claude CLI reviewer, then add Codex CLI and Gemini via `agy`.
+- If only CLI tools are available: use Codex CLI, Claude CLI, and `agy`.
+
 Launch independent reviewers in parallel before waiting on any single one.
 
 **Single-model mode**: Run one model only. Use this when:
@@ -96,7 +107,7 @@ dirgrab -s --no-tree 2>&1 | tail -15
 **Token budget check:**
 - Under ~250k tokens: all three models can participate
 - 250k–500k tokens: drop Codex (its 258k context is too tight), run Gemini +
-  Claude subagent only
+  Claude only
 - Over ~500k tokens: ask the user what to exclude via `-e` flags
 
 ## Step 3: Capture Codebase
@@ -189,50 +200,61 @@ Use background execution so they run simultaneously.
 
 **Codex GPT 5.5** (background bash):
 ```bash
-codex exec \
+codex -a never exec \
   -m gpt-5.5 \
   --sandbox read-only \
+  --ephemeral \
+  -C "$PWD" \
   -o "$REVIEW_DIR/codex_output.txt" \
   - \
-  < "$REVIEW_DIR/prompt.txt" 2>&1 &
+  < "$REVIEW_DIR/prompt.txt" > "$REVIEW_DIR/codex_log.txt" 2>&1 &
 CODEX_PID=$!
 ```
 Timeout: 600000ms.
 
-**Gemini 3.1 Pro** (background bash):
+**Gemini 3.1 Pro via `agy`** (background bash):
 ```bash
-cat "$REVIEW_DIR/prompt.txt" | gemini -m gemini-3.1-pro -p "Follow the instructions in stdin." \
-  --sandbox -o text > "$REVIEW_DIR/gemini_output.txt" 2>&1 &
+agy --print \
+  --sandbox \
+  --model 'Gemini 3.1 Pro (High)' \
+  --print-timeout 10m \
+  < "$REVIEW_DIR/prompt.txt" \
+  > "$REVIEW_DIR/gemini_output.txt" 2>&1 &
 GEMINI_PID=$!
 ```
 
-**Claude Opus 4.7 reviewer** (subagent or CLI):
+**Claude Opus reviewer** (subagent or CLI):
 
 In Claude Code, launch a `general-purpose` subagent with
-`run_in_background=true` and `model="opus-4.7"`. The prompt should include the
+`run_in_background=true` and `model="opus"`. The prompt should include the
 full contents of `$REVIEW_DIR/prompt.txt` and instruct the subagent to write its
 review to `$REVIEW_DIR/claude_output.txt`. **Always specify
-`model="opus-4.7"`** — without it, the orchestrator may default to haiku, which
-is too weak for bug-hunting.
+`model="opus"`** so Claude Code uses the latest Opus alias (currently Claude
+Opus 4.8 in Claude Code 2.1.167). Without it, the orchestrator may default to a
+weaker model.
 
 Outside Claude Code, use Claude CLI:
 
 ```bash
-cat "$REVIEW_DIR/prompt.txt" | claude \
-  -p \
-  --model opus-4.7 \
+claude \
+  --print \
+  --model opus \
+  --permission-mode plan \
   --tools "" \
+  --no-session-persistence \
+  --max-budget-usd 5 \
   --output-format text \
+  < "$REVIEW_DIR/prompt.txt" \
   > "$REVIEW_DIR/claude_output.txt" 2>&1 &
 CLAUDE_PID=$!
 ```
 
-**Same-harness subagent:**
+**Same-family subagent rule:**
 
 If the current harness supports spawning subagents, prefer a fresh read-only
-subagent of the orchestrator's own family as one reviewer. Give it the same
-prompt and require a written output artifact. This still counts as external
-review because it starts from a clean context and did not implement the change.
+subagent for the orchestrator's own model family. Give it the same prompt and
+require a written output artifact. This counts as that family slot because it
+starts from a clean context and did not implement the change under review.
 
 **Wait for all to complete:**
 ```bash
@@ -240,7 +262,8 @@ wait $CODEX_PID 2>/dev/null; CODEX_EXIT=$?
 wait $GEMINI_PID 2>/dev/null; GEMINI_EXIT=$?
 if [ -n "${CLAUDE_PID:-}" ]; then wait $CLAUDE_PID 2>/dev/null; CLAUDE_EXIT=$?; fi
 ```
-Check any same-harness subagent output as well.
+When a family slot is handled by a subagent instead of a CLI process, there may
+be no shell PID. Check its output artifact before merging.
 
 **Check results:**
 - If a model exited non-zero or produced empty output, log the failure and
@@ -255,30 +278,35 @@ Check any same-harness subagent output as well.
 
 #### If Codex:
 ```bash
-codex exec \
+codex -a never exec \
   -m gpt-5.5 \
   --sandbox read-only \
+  --ephemeral \
+  -C "$PWD" \
   -o "$REVIEW_DIR/codex_output.txt" \
   - \
-  < "$REVIEW_DIR/prompt.txt" 2>&1
+  < "$REVIEW_DIR/prompt.txt" > "$REVIEW_DIR/codex_log.txt" 2>&1
 ```
 Timeout: 600000ms. May take 2-5 minutes.
 
 #### If Gemini:
 
-Pipe the prompt file via stdin with a short `-p` flag — **never** pass a long
-inline prompt string, as Gemini CLI fails (exit 13) when stdin is large and the
-positional prompt arg is long.
+Pipe the prompt file via stdin. Do not use positional prompt arguments for
+`agy`; they have routed to the wrong model in local smoke tests.
 
 ```bash
-cat "$REVIEW_DIR/prompt.txt" | gemini -m gemini-3.1-pro -p "Follow the instructions in stdin." \
-  --sandbox -o text > "$REVIEW_DIR/gemini_output.txt" 2>&1
+agy --print \
+  --sandbox \
+  --model 'Gemini 3.1 Pro (High)' \
+  --print-timeout 10m \
+  < "$REVIEW_DIR/prompt.txt" \
+  > "$REVIEW_DIR/gemini_output.txt" 2>&1
 ```
 
 #### If Claude:
 
-Launch a `general-purpose` subagent via the Task tool with `model="opus-4.7"`
-when inside Claude Code. Otherwise use Claude CLI with `--model opus-4.7` and
+Launch a `general-purpose` subagent via the Task tool with `model="opus"`
+when inside Claude Code. Otherwise use Claude CLI with `--model opus` and
 `--tools ""`. Have it write its review to `$REVIEW_DIR/claude_output.txt`.
 
 ## Step 6: Merge Results (Parallel Mode Only)
@@ -315,7 +343,7 @@ Write the merged output to `$REVIEW_DIR/merged_review.md`.
 
 **Review Type**: code | spec-plan | implementation-slice | workflow
 **Backwards Compatibility Matters**: true | false | unknown
-**Models**: Codex/GPT, Gemini, Claude, same-harness subagent (or whichever participated)
+**Models**: Codex/GPT, Claude, Gemini (or whichever participated; one per family)
 **Degraded**: no | yes — reason
 **Context**: ~Nk tokens
 **Clean Result**: clean | not clean | blocked
@@ -332,29 +360,12 @@ Write the merged output to `$REVIEW_DIR/merged_review.md`.
 ...
 ```
 
-## Step 7: Capture Session IDs
+## Step 7: Session IDs
 
-For Codex and Gemini only (Claude subagent doesn't have persistent sessions).
-**Never use `--last` or `latest`** — parallel sessions will collide.
-
-### Codex:
-```bash
-SESSION_ID=$(ls -t ~/.codex/sessions/$(date -u +%Y/%m/%d)/*.jsonl 2>/dev/null \
-  | head -1 \
-  | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
-echo "$SESSION_ID" > "$REVIEW_DIR/codex_session_id"
-```
-
-### Gemini:
-```bash
-SESSION_ID=$(gemini --list-sessions 2>/dev/null \
-  | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \
-  | tail -1)
-echo "$SESSION_ID" > "$REVIEW_DIR/gemini_session_id"
-```
-
-If a UUID capture fails (empty string), warn the user that follow-ups for that
-model may not work reliably, but continue.
+The default review commands are one-off. Codex uses `--ephemeral`, Claude CLI
+uses `--no-session-persistence`, Claude subagents do not expose a portable
+session ID here, and `agy` does not have a tested persistent-session workflow.
+Do not capture or rely on session IDs in the normal parallel review flow.
 
 ## Step 8: Present Results
 
@@ -375,19 +386,11 @@ Clean means:
 
 ## Step 9: Follow-up (Optional)
 
-If the user has follow-up questions, resume the relevant model's session.
-
-### Codex follow-up:
-```bash
-SESSION_ID=$(cat "$REVIEW_DIR/codex_session_id")
-codex exec resume -m gpt-5.5 "$SESSION_ID" "follow-up question" 2>&1
-```
-
-### Gemini follow-up:
-```bash
-SESSION_ID=$(cat "$REVIEW_DIR/gemini_session_id")
-echo "follow-up question" | gemini -m gemini-3.1-pro -r "$SESSION_ID" --sandbox -o text 2>&1
-```
+If the user has follow-up questions, build a new focused prompt that includes
+the follow-up question, the prior reviewer output, and only the needed
+code/context. If you intentionally ran Codex without `--ephemeral` and captured
+a session UUID, you may resume that session with `codex -a never exec resume`,
+but do not use `--last` or `latest` in parallel review workflows.
 
 Follow-ups are mostly relevant for single-model mode. In parallel mode, the
 merged review usually has enough context to act on directly.
@@ -413,7 +416,7 @@ External models can hit rate limits or fail. Handle this without stopping:
 | Situation | Action |
 |-----------|--------|
 | Codex rate-limited or fails | Drop Codex, continue with Gemini + Claude |
-| Gemini rate-limited or fails | Drop Gemini, continue with Codex + Claude |
+| Gemini / `agy` rate-limited or fails | Drop Gemini, continue with Codex + Claude |
 | Claude unavailable/fails | Continue with Codex/GPT + Gemini or whichever external reviewers remain |
 | Only one reviewer type succeeds | Valid but degraded; record it, keep the two-clean-round gate, and try to restore the full panel next round |
 
@@ -427,7 +430,7 @@ failed once.
 ## Safety Rules
 
 - **Never** use write-mode sandbox for reviews
-- **Never** pass `--full-auto` (Codex) or `--yolo` (Gemini)
-- **Always** sandbox: `--sandbox read-only` (Codex) or `--sandbox` (Gemini)
+- **Never** pass `--full-auto` (Codex) or `--yolo` / `-y` (legacy Gemini)
+- **Always** sandbox: `--sandbox read-only` (Codex) or `--sandbox` (`agy`)
 - **Always** build prompts as files, never as shell arguments
 - **Always** include read-only instructions in the prompt text (belt + suspenders)
