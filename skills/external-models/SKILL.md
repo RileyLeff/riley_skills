@@ -196,7 +196,6 @@ claude \
   --permission-mode plan \
   --tools "" \
   --no-session-persistence \
-  --max-budget-usd 5 \
   --output-format text \
   < "$REVIEW_DIR/prompt.txt" \
   > "$REVIEW_DIR/claude_output.txt" 2>&1

@@ -104,7 +104,7 @@ Run `dirgrab -s --no-tree` to show per-file token breakdowns. If a
 dirgrab -s --no-tree 2>&1 | tail -15
 ```
 
-**Token budget check:**
+**Context size check:**
 - Under ~250k tokens: all three models can participate
 - 250k–500k tokens: drop Codex (its 258k context is too tight), run Gemini +
   Claude only
@@ -242,7 +242,6 @@ claude \
   --permission-mode plan \
   --tools "" \
   --no-session-persistence \
-  --max-budget-usd 5 \
   --output-format text \
   < "$REVIEW_DIR/prompt.txt" \
   > "$REVIEW_DIR/claude_output.txt" 2>&1 &

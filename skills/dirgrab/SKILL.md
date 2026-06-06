@@ -206,7 +206,7 @@ dirgrab --no-tree -e '*.lock,planning/' -o "$REVIEW_DIR/context.txt" -s
 dirgrab --no-tree -e '*.lock' -o "$REVIEW_DIR/context.txt" -s
 agy --print --sandbox --model 'Gemini 3.1 Pro (High)' < "$REVIEW_DIR/context.txt"
 
-# Check token budget before committing to an expensive model call
+# Check context size before launching a model call
 dirgrab -s --no-tree -e '*.lock' 2>&1 | tail -5
 # If under ~250k tokens: safe for Codex
 # If under ~400k tokens: safe for Gemini
