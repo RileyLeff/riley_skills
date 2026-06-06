@@ -430,7 +430,7 @@ failed once.
 ## Safety Rules
 
 - **Never** use write-mode sandbox for reviews
-- **Never** pass `--full-auto` (Codex) or `--yolo` / `-y` (legacy Gemini)
+- **Never** pass `--full-auto` to Codex
 - **Always** sandbox: `--sandbox read-only` (Codex) or `--sandbox` (`agy`)
 - **Always** build prompts as files, never as shell arguments
 - **Always** include read-only instructions in the prompt text (belt + suspenders)

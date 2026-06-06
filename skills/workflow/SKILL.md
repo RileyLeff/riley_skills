@@ -448,8 +448,8 @@ optional — only include it if you actually have something to report. Examples:
   when models disagree"
 - "Workflow skill: should mention running `cargo clippy` before review rounds
   for Rust projects"
-- "External models: Gemini's `-p` flag doesn't work with `--sandbox` on
-  files >500k"
+- "External models: `agy` positional prompts routed to the wrong model during
+  smoke testing; stdin should stay mandatory"
 
 Keep it to 1-3 bullet points. Only flag things you actually encountered — don't
 speculate or pad. If everything worked smoothly, skip this section entirely.

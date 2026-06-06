@@ -121,7 +121,6 @@ printf 'Reply exactly: agy smoke ok' | agy --print \
 - `--model 'Gemini 3.1 Pro (High)'` : use Gemini 3.1 Pro for serious review work
 - `--print-timeout 10m` : allow enough time for large review prompts
 - No `--output-format` / `-o` flag in `agy`
-- No `--yolo` or `-y` - never auto-approve tool calls
 
 ### Important
 - **Always** provide full codebase via stdin (dirgrab output) - Gemini is bad at
@@ -131,8 +130,7 @@ printf 'Reply exactly: agy smoke ok' | agy --print \
   with sandbox)
 - dirgrab includes untracked files by default — no need to commit first (only
   `--tracked-only` mode skips uncommitted files)
-- Do not use the legacy `gemini` CLI model strings here for serious reviews
-  unless you have re-tested them locally. Use `agy` for Gemini 3.1 Pro.
+- For Gemini reviews, Antigravity CLI (`agy`) is the canonical interface.
 - `agy` output may include stray copied flag text; keep the sandbox anyway and
   merge findings based on substance.
 
