@@ -1,244 +1,184 @@
 ---
 name: external-models
-description: "Reference for invoking external AI models and fresh reviewer agents (Codex/GPT, Claude/Claude Code, Gemini via Antigravity CLI). Capabilities, flags, strengths, weaknesses, and invocation patterns. Use when you need to shell out to another model, run reviews, do multimodal analysis, or coordinate one-reviewer-per-family collaboration."
+description: "Coordinate fresh agents from the Codex/GPT, Claude, and Gemini model families when the user requests another model, independent opinions, a cross-model review, or a multi-model panel. Represent the current caller's own model family with a fresh built-in subagent, and invoke only the other families through persistent CLI sessions. Discover installed CLI/model capabilities at runtime, preserve agent and session identifiers for follow-ups, and do not use this for ordinary work the current agent can handle directly."
 ---
 
-# External Model Reference
+# Cross-model collaboration
 
-## Codex CLI
+Coordinate model families without duplicating the current family through an
+external CLI. The coordinating agent's own analysis does not count as an
+independent lane.
 
-**Model**: gpt-5.5, reasoning level xhigh
-**Context**: ~258k tokens with excellent auto-compact
+## Routing rule
 
-### Strengths
-- Strong agent — discovers codebase structure on its own without hand-holding
-- Trustworthy for write access when instructed
-- Excellent at following specific, well-scoped instructions
-- Good at agentic exploration and bug hunting
-- Extremely smart, has non-overlapping intelligence with Claude
-- Behaves like a "senior engineer"
+First identify the current agent's model family. For a standard three-family
+round, use this exact mapping:
 
-### Weaknesses
-- Can take a very long time on large prompts
+| Coordinating family | Codex/GPT lane | Claude lane | Gemini lane |
+| --- | --- | --- | --- |
+| Codex/GPT | Fresh built-in subagent | Persistent Claude CLI session | Persistent Antigravity CLI session |
+| Claude | Persistent Codex CLI session | Fresh built-in subagent | Persistent Antigravity CLI session |
+| Gemini | Persistent Codex CLI session | Persistent Claude CLI session | Fresh built-in subagent |
 
-### Notes
-- No `--approval-mode` flag. Use `--sandbox` and put global approval flags
-  before `exec`.
+A **fresh built-in subagent** means the current environment's native
+spawn/delegate mechanism. It is a new agent from the coordinating model family,
+not the coordinator itself and not a CLI process.
 
-### Invocation Patterns
+Never launch an external Codex session from a Codex/GPT coordinator, an external
+Claude session from a Claude coordinator, or an external Gemini session from a
+Gemini coordinator when a native subagent mechanism is available. Describe
+this route as the current-family native subagent.
 
-**Read-only review** (most common):
-```bash
-codex -a never exec \
-  -m gpt-5.5 \
-  --sandbox read-only \
-  --ephemeral \
-  -C "$PWD" \
-  -o "$REVIEW_DIR/output.txt" \
-  - \
-  < "$REVIEW_DIR/prompt.txt" > "$REVIEW_DIR/codex_log.txt" 2>&1
-```
+If native subagents are unavailable, use that family's CLI only as a fallback
+and report the degraded routing explicitly.
 
-**Write access** (for edits, test writing, bug fixing):
-```bash
-codex -a never exec \
-  -m gpt-5.5 \
-  --sandbox workspace-write \
-  --ephemeral \
-  -C "$PWD" \
-  -o "$REVIEW_DIR/output.txt" \
-  - \
-  < "$REVIEW_DIR/prompt.txt" > "$REVIEW_DIR/codex_log.txt" 2>&1
-```
+## Choose the roster
 
-**Resume a non-ephemeral session** (follow-up with a specific session ID):
-```bash
-codex -a never exec resume -m gpt-5.5 "$SESSION_ID" "follow-up question" 2>&1
-```
+- For a cross-model review, panel, or request for multiple independent agents
+  without a specified roster, use one lane from each of the three families.
+- For a request naming one provider, invoke only that provider unless the user
+  also asks for a comparison or baseline.
+- For a custom roster, create exactly the requested lanes.
+- Launch independent lanes concurrently when the environment supports it.
+- Do not ask a lane to launch the other lanes; the coordinator owns routing.
 
-### Key Flags
-- `-a never` : global approval policy flag; place before `exec`
-- `-` : read prompt from stdin (always use this — never pass large prompts as args)
-- `--sandbox read-only` : prevent writes
-- `--sandbox workspace-write` : allow edits to project files
-- `--ephemeral` : avoid persistent session/state collisions for one-off reviews
-- `-C "$PWD"` : run against the intended project directory
-- `-o <file>` : capture final response to file
-- `-m gpt-5.5` : use GPT 5.5 for serious review and implementation passes
+## Freshness and persistence
 
-### Important
-- **Never** pass `--full-auto`
-- **Always** build prompts as files, pipe via stdin (`< file`), not as shell arguments
-- The review commands shown above use `--ephemeral`. Drop it deliberately only
-  when you want a resumable Codex session and have a collision-safe plan.
-- Can take 2-5 minutes on large codebases — use generous timeouts (600000ms)
+- Start every lane fresh for the task.
+- Give each lane only the task, relevant constraints, and necessary artifacts.
+  Avoid inheriting unrelated conversation history when the native subagent API
+  allows control over context inheritance.
+- Preserve the native subagent handle or identifier and use the environment's
+  follow-up mechanism to continue with that same agent.
+- Create persistent external CLI sessions by default. Capture exact session or
+  conversation IDs and resume by ID, not by recency.
+- Use one lane per family and task. Reuse it for challenges, clarifications,
+  fixes, and follow-up review instead of silently replacing it with a new agent.
 
----
+## Core rules
 
-## Gemini via Antigravity CLI (`agy`)
+- Discover installed CLI versions and model capabilities at runtime. Do not
+  encode a point-in-time model catalog.
+- Omit model-selection flags unless the user requests a model or a verified
+  task requirement calls for one.
+- Pipe substantial prompts through stdin. Do not pass codebase dumps as shell
+  arguments.
+- Keep review and consultation lanes read-only. Grant write access only when
+  the user explicitly delegates edits.
+- Respect current user and project instructions about provider selection.
+- Record unavailable or rate-limited lanes instead of substituting an
+  unrequested family.
 
-**Model**: `Gemini 3.1 Pro (High)` for serious review work
-**Context**: 1M tokens, but quality degrades around ~400k tokens
+## Discover external surfaces
 
-### Strengths
-- Best multimodal by a lot — image analysis, document processing, OCR
-- Quantitative/detection tasks in images
-- Enormous context window for large codebases
-- Good for "read everything and tell me what you think" tasks
+Check only the CLIs needed for external-family lanes:
 
-### Weaknesses
-- Not a good agent — struggles to follow instructions reliably
-- Will try to write even when told read-only (hence the sandbox flag)
-- Not great at agentic search
-- Quality degrades with very large context even though window allows it
-- Positional prompt arguments can route to the wrong model; stdin is reliable
-- No tested persistent-session workflow for review follow-ups
+    command -v codex && codex --version
+    command -v agy && agy --version && agy models
+    command -v claude && claude --version
 
-### Invocation Patterns
+Verify invocation flags with each installed CLI's current `--help` output.
+Treat configured defaults and rolling model aliases as dynamic.
 
-**Read-only review** (build prompt file, pipe via stdin):
+## Context strategy
 
-```bash
-agy --print \
-  --sandbox \
-  --model 'Gemini 3.1 Pro (High)' \
-  --print-timeout 10m \
-  < "$REVIEW_DIR/prompt.txt" \
-  > "$REVIEW_DIR/gemini_output.txt" 2>&1
-```
+Prefer direct filesystem access when a lane can inspect the workspace. Supply
+the working directory, task, constraints, and useful entry points.
 
-**Quick smoke test**:
-```bash
-printf 'Reply exactly: agy smoke ok' | agy --print \
-  --sandbox \
-  --model 'Gemini 3.1 Pro (Low)' \
-  --print-timeout 60s
-```
+Use `dirgrab` only when the user wants a frozen context dump, a lane cannot
+inspect the repository directly, or a complete snapshot is materially better
+than agentic discovery. Include the whole relevant repository or subtree while
+excluding low-signal space hogs when appropriate.
 
-### Key Flags
-- `--print` : non-interactive mode
-- `--sandbox` : OS-level write restriction (Seatbelt on macOS)
-- `--model 'Gemini 3.1 Pro (High)'` : use Gemini 3.1 Pro for serious review work
-- `--print-timeout 10m` : allow enough time for large review prompts
-- No `--output-format` / `-o` flag in `agy`
+## Current-family native subagent lane
 
-### Important
-- **Always** provide full codebase via stdin (dirgrab output) - Gemini is bad at
-  agentic file discovery, and `agy` positional prompts have been unreliable
-- **Always** use `--sandbox` on every invocation
-- **Always** include read-only instructions in the prompt (belt and suspenders
-  with sandbox)
-- dirgrab includes untracked files by default — no need to commit first (only
-  `--tracked-only` mode skips uncommitted files)
-- For Gemini reviews, Antigravity CLI (`agy`) is the canonical interface.
-- `agy` output may include stray copied flag text; keep the sandbox anyway and
-  merge findings based on substance.
+Use the coordinating environment's built-in subagent tool:
 
----
+1. Spawn one fresh agent from the current model family.
+2. Minimize inherited conversation context when supported.
+3. Give it the same substantive task and evidence available to external lanes.
+4. Keep it independent: do not include other lanes' conclusions in its initial
+   prompt.
+5. Save its agent handle for follow-up.
 
-## Claude / Claude Code
+Do not treat the coordinator's own answer as the current-family lane.
 
-**Model**: use the rolling Opus alias, `--model opus`
-**Training cutoff**: May 2025
+## External Codex/GPT lane
 
-As of Claude Code 2.1.167, `--model opus` resolves to
-`claude-opus-4-8` (Claude Opus 4.8). Prefer the alias so this skill does not
-need to chase Anthropic point releases. The tested CLI does not support a
-standalone `--opus` flag.
+Use this only when Codex/GPT is not the coordinating family, or when native
+subagents are unavailable.
 
-If you are in Claude Code, prefer fresh Claude subagents to fill the Claude
-review slot. If you are in Codex or another harness, use Claude CLI when
-available. In either case, the reviewer counts only if it starts from a clean
-context and did not implement the change under review.
+Codex persists sessions unless `--ephemeral` is passed. Start a read-only
+session and capture its JSONL events:
 
-### Strengths
-- Generally available inside Claude Code as a fresh subagent
-- Starts fresh as a subagent without implementation bias (good for reviewing
-  code you just wrote)
-- Fast — no network round-trip to an external CLI
-- Strong at nuanced logic issues and architectural reasoning
+    RUN_DIR=$(mktemp -d "${TMPDIR:-/tmp}/external-codex-XXXXXXXX")
+    codex -a never exec --sandbox read-only -C "$PWD" --json -o "$RUN_DIR/last-message.txt" - < prompt.txt > "$RUN_DIR/events.jsonl"
 
-### Weaknesses
-- As the implementer, a Claude subagent shares your training data and biases —
-  it may have the same blind spots you do (this is why multi-model review is
-  valuable)
-- No persistent session for follow-ups in the recommended review flow
+Extract the exact identifier from the `thread.started` event:
 
-### Invocation Patterns
+    SESSION_ID=$(jq -r 'select(.type == "thread.started") | .thread_id' "$RUN_DIR/events.jsonl" | head -n 1)
 
-**Subagent review** (used in parallel review rounds):
+Resume that conversation:
 
-Launch a `general-purpose` subagent via the Task tool. Read the prompt file
-built in the review flow and pass its content as the subagent prompt. Have it
-write its review to a file.
+    codex -a never exec resume --json -o "$RUN_DIR/follow-up.txt" "$SESSION_ID" - < follow-up.txt > "$RUN_DIR/follow-up-events.jsonl"
 
-```
-Task(
-  subagent_type="general-purpose",
-  model="opus",
-  run_in_background=true,
-  prompt="Read the following codebase and review instructions, then write
-    your review to $REVIEW_DIR/claude_output.txt using the Write tool.
-    [contents of $REVIEW_DIR/prompt.txt]"
-)
-```
+For delegated edits, change the initial sandbox to `workspace-write`. Never
+use `--ephemeral`, `--dangerously-bypass-approvals-and-sandbox`, or
+`--full-auto` by default.
 
-**Always specify `model="opus"`** for review subagents. Without it, the
-orchestrator may default to haiku, which is fast but too weak for catching bugs.
+## External Gemini lane via Antigravity CLI
 
-**Claude CLI read-only review** (when outside Claude Code or when a separate
-Claude process is preferred):
+Use this only when Gemini is not the coordinating family, or when native
+subagents are unavailable.
 
-```bash
-claude \
-  --print \
-  --model opus \
-  --permission-mode plan \
-  --tools "" \
-  --no-session-persistence \
-  --output-format text \
-  < "$REVIEW_DIR/prompt.txt" \
-  > "$REVIEW_DIR/claude_output.txt" 2>&1
-```
+`agy` persists conversations and resumes them with
+`--conversation <id>`:
 
-**Claude CLI tool-assisted pass** (only when you intentionally want it to
-explore files itself):
+    agy --print --sandbox --mode plan --print-timeout 10m < prompt.txt
 
-```bash
-claude \
-  --add-dir "$PWD" \
-  --model opus \
-  --print \
-  "Review this repository for bugs and architectural risks."
-```
+Capture the exact conversation ID or resume command printed by the CLI. Resume
+that conversation with:
 
-### Important
-- Subagents start with a clean context — they don't inherit your conversation
-  history, which is a feature for unbiased review
-- For parallel reviews, launch the subagent with `run_in_background=true` so it
-  runs concurrently with Codex and Gemini
-- The subagent has access to Read/Write/Glob/Grep tools but not Bash by default
-- For isolated CLI review rounds, prefer `--tools ""` when the full context is
-  already in the prompt so the review stays deterministic
+    agy --conversation "$CONVERSATION_ID" --print --sandbox --mode plan --print-timeout 10m < follow-up.txt
 
-When orchestrating multi-model work, defer to this file for correct model names
-and invocation patterns. If something here looks outdated or you find a mismatch
-between real-world use and the patterns described in this skill, tell the user
-and suggest filing an issue or PR at this skill's
-[github repository](https://github.com/rileyleff/riley_skills).
+Use `agy --continue` only when no concurrent session can make recency
+ambiguous. Use a write-capable mode only when explicitly authorized.
 
+## External Claude lane
 
----
+Use this only when Claude is not the coordinating family, or when native
+subagents are unavailable.
 
-## Model Selection Guide
+Create an exact session ID up front:
 
-| Task | Best Model | Why |
-|------|-----------|-----|
-| Code review | All three in parallel | Non-overlapping blind spots; merge for consensus |
-| Bug hunting | Codex (write mode) | Can explore and fix, not just report |
-| Architecture review | All three in parallel | Same as code review; Gemini shines on large codebases |
-| Multimodal (images, docs, OCR) | Gemini | Best multimodal by far |
-| Long-context analysis | Gemini | 1M context window |
-| Test writing | Codex (write mode) | Good at following test conventions |
-| Implementation | Orchestrator's native harness | Keep implementation local; use external reviewers after |
-| Quick second opinion | Gemini | Fast, low-effort |
+    SESSION_ID=$(uuidgen | tr '[:upper:]' '[:lower:]')
+    claude --print --session-id "$SESSION_ID" --permission-mode plan --output-format json < prompt.txt
+
+Resume that conversation:
+
+    claude --print --resume "$SESSION_ID" --permission-mode plan --output-format json < follow-up.txt
+
+Do not pass `--no-session-persistence` unless the user explicitly wants a
+disposable session. Use the configured default model unless the user or a
+verified capability requirement calls for another.
+
+## Synthesis and handoff
+
+Keep lane outputs independent until every initial result is collected. Then:
+
+1. Attribute findings to their model family.
+2. Reconcile agreements and disagreements using evidence.
+3. Distinguish the coordinator's synthesis from lane conclusions.
+4. Preserve every agent/session identifier for follow-up.
+
+Report for each lane:
+
+- model family and whether it used a native subagent or external CLI;
+- CLI version and resolved model when applicable;
+- exact agent, session, or conversation identifier;
+- exact resume/follow-up mechanism;
+- permission mode and working directory;
+- substantive result or failure state.
+
+Keep raw logs in unique task-local directories when useful. Do not add session
+logs or manifests to a repository unless the user asks.

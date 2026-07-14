@@ -1,7 +1,7 @@
 {
   "name": "riley-skills",
-  "description": "Riley's personal development toolkit. Workflow automation, multi-model review orchestration, and project conventions.",
-  "version": "1.5.3",
+  "description": "Riley's personal development toolkit for cross-model collaboration, codebase context dumps, and project setup.",
+  "version": "2.0.0",
   "author": {
     "name": "RileyLeff"
   },

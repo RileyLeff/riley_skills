@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "riley-skills",
-  "description": "Riley's personal development toolkit for workflow automation, multi-model review orchestration, and project conventions.",
+  "description": "Riley's personal development toolkit for cross-model collaboration, codebase context dumps, and project setup.",
   "owner": {
     "name": "RileyLeff"
   },
@@ -9,7 +9,7 @@
     {
       "name": "riley-skills",
       "source": "./",
-      "description": "Workflow automation, multi-model review orchestration, and project conventions for Claude Code."
+      "description": "Cross-model collaboration, codebase context dumps, and project setup for Claude Code."
     }
   ]
 }

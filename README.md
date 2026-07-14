@@ -24,39 +24,27 @@ claude plugin update riley-skills@riley-skills
 
 Some skills depend on external tools:
 
-- **review** and **dirgrab** need [dirgrab](https://github.com/rileyleff/dirgrab) installed (`brew tap rileyleff/rileytap && brew install dirgrab` or `cargo install dirgrab`)
-- **review** works best with Codex CLI, Claude/Claude Code, and Antigravity CLI (`agy`) for Gemini available, but degrades gracefully when one reviewer is rate-limited or unavailable
-- **slack-notify** needs [uv](https://docs.astral.sh/uv/) installed and a `SLACK_BOT_TOKEN` env var set (see the [workflow skill](skills/workflow/SKILL.md#5-human-checkpoints--notifications) for setup details)
+- **dirgrab** needs [dirgrab](https://github.com/rileyleff/dirgrab) installed (`brew tap rileyleff/rileytap && brew install dirgrab` or `cargo install dirgrab`)
+- **external-models** uses whichever supported CLIs are installed: Codex CLI, Antigravity CLI (`agy`), and Claude Code
 
 ## Contents
 
-### MCP
-
-#### slack-notify
-
-Simple MCP server that lets your agent ping you on Slack. Two tools: `slack_notify` for fire-and-forget status updates, and `slack_ask` for when the agent actually needs your input — it posts a message, waits for your threaded reply, and continues. Handy for long-running workflows where you don't want to babysit a terminal.
-
-Both tools accept an optional `channel` parameter. If not provided, they fall back to the `SLACK_CHANNEL` env var. This lets you configure channels per-project in your `CLAUDE.md` (e.g. "When using slack tools, use channel `C0123456789`") without touching env vars.
-
 ### Skills
-
-#### workflow
-
-Encodes my full development process for larger projects: read an architecture plan, load `planning/workflow.toml` policy knobs, break the work into steps, implement with atomic commits, run multi-model review loops, fix bugs until clean, and notify the human at checkpoints. Designed for hands-off autonomous work, you give it a plan (specific architectural ideas) and a "soul document" (describing your overall intent), it does the rest. Getting frequent external reviews, clearing out old stuff when compatibility policy allows it, and pausing at major checkpoints for extensive bugfixes generally enables projects to scale a little larger if they have solid foundations. Once it's in, try the project yourself, add a new architecture file if necessary, and repeat. Will keep refining this over time.
-
-#### review
-
-Runs code, spec, implementation-plan, or workflow reviews using one fresh reviewer from each available model family: Codex/GPT, Claude/Claude Code, and Gemini via `agy`. Gathers context with dirgrab, ships it off in read-only sandboxes or clean subagent contexts, and brings back structured results. Built to avoid multi-agent collisions, let me know if you run into any issues with it.
 
 #### external-models
 
-Ever have your agent refuse to believe that Codex 5.N exists and insist on using GPT-4o? This is a quick reference on the latest models: what they're good at, how to invoke them, and when to pick one over another. Keeps your agent from hallucinating CLI flags.
-
-This one is the most likely to get out of sync with specific CLI harness usage given the rate that they change, will try to keep it updated. Might need to set up some kind of recurring autonomous review + update cycle if it breaks often.
+Coordinates fresh Codex/GPT, Claude, and Gemini agents for independent opinions
+and cross-model analysis. The caller's own family is represented by a fresh
+built-in subagent; only the other families use persistent CLI sessions. It
+discovers CLI/model capabilities at runtime and preserves every agent/session
+identifier for follow-up.
 
 #### dirgrab
 
-Skill for my Rust tool [dirgrab](https://github.com/rileyleff/dirgrab) that concatenates a whole directory into one big text chunk. Convenient for code review, agent invocation, or any time you need to hand an LLM your entire codebase in one shot.
+Skill for my Rust tool [dirgrab](https://github.com/rileyleff/dirgrab) that
+concatenates a whole directory into one big text chunk. It is deliberately
+reserved for portable repository/subtree context dumps rather than ordinary
+local code exploration.
 
 #### init-project
 
